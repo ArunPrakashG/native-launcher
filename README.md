@@ -90,7 +90,7 @@ _Coming soon: AUR, .deb, .rpm packages_
    ```
 
 2. **Keyboard Shortcut:** Configure in your compositor to open on `Super+Space`
-   
+
    See [HOTKEY_SETUP.md](HOTKEY_SETUP.md) for detailed setup instructions for all compositors.
 
 3. **Search & Launch:**

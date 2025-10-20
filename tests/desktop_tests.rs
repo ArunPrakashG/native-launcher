@@ -29,13 +29,17 @@ mod tests {
     fn test_desktop_scanner_paths() {
         let scanner = DesktopScanner::new();
         let paths = scanner.paths();
-        
+
         // Should include system path
-        assert!(paths.iter().any(|p| p.to_str().unwrap().contains("/usr/share/applications")));
-        
+        assert!(paths
+            .iter()
+            .any(|p| p.to_str().unwrap().contains("/usr/share/applications")));
+
         // Should include user path if HOME is set
         if std::env::var("HOME").is_ok() {
-            assert!(paths.iter().any(|p| p.to_str().unwrap().contains(".local/share/applications")));
+            assert!(paths
+                .iter()
+                .any(|p| p.to_str().unwrap().contains(".local/share/applications")));
         }
     }
 
@@ -70,7 +74,7 @@ mod tests {
     #[test]
     fn test_entry_matching_case_insensitive() {
         let entry = create_test_entry("Firefox", "firefox");
-        
+
         assert!(entry.matches("FIREFOX"));
         assert!(entry.matches("firefox"));
         assert!(entry.matches("FiReFoX"));
@@ -151,10 +155,10 @@ mod tests {
             create_test_entry("App1", "app1"),
             create_test_entry("App2", "app2"),
         ];
-        
+
         let engine = SearchEngine::new(entries);
         let results = engine.search("", 10);
-        
+
         // Empty query should return all entries
         assert_eq!(results.len(), 2);
     }
@@ -166,10 +170,10 @@ mod tests {
             create_test_entry("Chrome", "chrome"),
             create_test_entry("Safari", "safari"),
         ];
-        
+
         let engine = SearchEngine::new(entries);
         let results = engine.search("fire", 10);
-        
+
         // Should only return Firefox
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].name, "Firefox");
@@ -183,10 +187,10 @@ mod tests {
             create_test_entry("App3", "app3"),
             create_test_entry("App4", "app4"),
         ];
-        
+
         let engine = SearchEngine::new(entries);
         let results = engine.search("app", 2);
-        
+
         // Should respect limit
         assert_eq!(results.len(), 2);
     }
@@ -217,10 +221,10 @@ mod tests {
                 no_display: false,
             },
         ];
-        
+
         let engine = SearchEngine::new(entries);
         let results = engine.search("firefox", 10);
-        
+
         // Exact match should come first
         assert_eq!(results[0].name, "Firefox");
     }
@@ -251,10 +255,10 @@ mod tests {
                 no_display: true,
             },
         ];
-        
+
         let engine = SearchEngine::new(entries);
         let results = engine.search("app", 10);
-        
+
         // Should only show visible app
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].name, "Visible App");
@@ -275,7 +279,7 @@ mod tests {
         };
 
         assert!(terminal_entry.terminal);
-        
+
         let gui_entry = create_test_entry("Firefox", "firefox");
         assert!(!gui_entry.terminal);
     }
