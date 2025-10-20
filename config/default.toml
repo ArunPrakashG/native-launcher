@@ -1,0 +1,84 @@
+# Configuration file for Native Launcher
+# Location: ~/.config/native-launcher/config.toml
+
+[appearance]
+# Window dimensions
+width = 800
+height = 600
+
+# Position: "top", "center", or "bottom"
+position = "center"
+
+# Maximum number of results to display
+max_results = 10
+
+# Show application icons
+show_icons = true
+
+# Icon size in pixels
+icon_size = 48
+
+# Theme: "dark", "light", or path to custom CSS file
+theme = "dark"
+
+[behavior]
+# Global keyboard shortcut (configured in compositor)
+# This is just documentation - actual binding happens in compositor config
+activation_key = "Super_L+space"
+
+# Enable fuzzy search
+fuzzy_search = true
+
+# Remember and rank by usage frequency
+remember_usage = true
+
+# Days to keep usage history
+usage_cache_days = 90
+
+[keyboard]
+# Navigation keys
+move_up = "Up"
+move_down = "Down"
+move_left = "Left"
+move_right = "Right"
+
+# Action keys
+select = "Return"
+close = "Escape"
+
+# Quick launch keys (Ctrl+1 through Ctrl+0 for first 10 results)
+launch_1 = "Control+1"
+launch_2 = "Control+2"
+launch_3 = "Control+3"
+launch_4 = "Control+4"
+launch_5 = "Control+5"
+launch_6 = "Control+6"
+launch_7 = "Control+7"
+launch_8 = "Control+8"
+launch_9 = "Control+9"
+launch_10 = "Control+0"
+
+[plugins]
+# List of enabled plugins
+enabled = ["applications", "calculator", "shell"]
+
+[plugins.applications]
+# Show GenericName field from desktop files
+show_generic_name = true
+
+# Show Categories field
+show_categories = false
+
+# Scan these additional directories for .desktop files
+# additional_dirs = ["/opt/custom-apps"]
+
+[plugins.calculator]
+# Automatically evaluate math expressions
+auto_calculate = true
+
+[plugins.shell]
+# Execute shell commands in terminal
+show_in_terminal = false
+
+# Default terminal if not detected
+# default_terminal = "alacritty"

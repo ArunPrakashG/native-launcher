@@ -1,0 +1,208 @@
+/* Native Launcher - Raycast Design Language */
+
+/* === Raycast Color Palette === */
+:root {
+  /* Primary Colors - Raycast Purple/Magenta */
+  --raycast-primary: #ff6363;
+  --raycast-primary-hover: #ff7a7a;
+  --raycast-primary-active: #ff4d4d;
+
+  /* Background Colors - Dark Charcoal Theme */
+  --raycast-bg-primary: #1c1c1e;
+  --raycast-bg-secondary: #2c2c2e;
+  --raycast-bg-tertiary: #3a3a3c;
+
+  /* Text Colors */
+  --raycast-text-primary: #ffffff;
+  --raycast-text-secondary: #ebebf5;
+  --raycast-text-tertiary: #ebebf599;
+  --raycast-text-quaternary: #ebebf54d;
+
+  /* Border & Divider Colors */
+  --raycast-border: #3a3a3c;
+  --raycast-divider: #48484a;
+
+  /* Shadow Colors */
+  --raycast-shadow: rgba(0, 0, 0, 0.3);
+  --raycast-shadow-strong: rgba(0, 0, 0, 0.5);
+}
+
+/* === Main Window - Raycast Container === */
+window {
+  background-color: var(--raycast-bg-primary);
+  border-radius: 16px;
+  border: 1px solid var(--raycast-border);
+  box-shadow: 0 16px 70px var(--raycast-shadow-strong),
+    0 0 0 0.5px rgba(255, 255, 255, 0.05) inset;
+  padding: 0;
+}
+
+/* === Search Entry - Raycast Search Bar === */
+entry {
+  font-size: 20px;
+  font-weight: 400;
+  padding: 14px 20px;
+  margin: 12px;
+  border-radius: 10px;
+  background-color: var(--raycast-bg-secondary);
+  color: var(--raycast-text-primary);
+  border: 1px solid transparent;
+  box-shadow: none;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+entry:focus {
+  background-color: var(--raycast-bg-secondary);
+  border-color: var(--raycast-primary);
+  box-shadow: 0 0 0 3px rgba(255, 99, 99, 0.15);
+  outline: none;
+}
+
+entry::placeholder {
+  color: var(--raycast-text-quaternary);
+  font-weight: 400;
+}
+
+entry::selection {
+  background-color: var(--raycast-primary);
+  color: var(--raycast-text-primary);
+}
+
+/* === Scrolled Window - Clean Container === */
+scrolledwindow {
+  border: none;
+  background-color: transparent;
+  margin: 0 6px 6px 6px;
+}
+
+/* === List Box - Results Container === */
+listbox {
+  background-color: transparent;
+  padding: 0;
+  border-top: 1px solid var(--raycast-border);
+}
+
+/* === List Rows - Raycast Result Items === */
+listbox row {
+  padding: 12px 16px;
+  margin: 0;
+  border-radius: 8px;
+  background: transparent;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  border: none;
+  border-bottom: 1px solid transparent;
+}
+
+listbox row:hover {
+  background-color: var(--raycast-bg-secondary);
+}
+
+listbox row:selected {
+  background-color: var(--raycast-primary);
+}
+
+listbox row:selected:hover {
+  background-color: var(--raycast-primary-hover);
+}
+
+/* === Labels - Raycast Typography === */
+label {
+  color: var(--raycast-text-primary);
+  font-weight: 500;
+  text-shadow: none;
+  transition: color 0.15s ease;
+}
+
+listbox row label {
+  color: var(--raycast-text-secondary);
+}
+
+listbox row:selected label {
+  color: var(--raycast-text-primary);
+  font-weight: 600;
+}
+
+.dim-label {
+  color: var(--raycast-text-tertiary);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+listbox row:selected .dim-label {
+  color: var(--raycast-text-secondary);
+  opacity: 0.9;
+}
+
+/* === Scrollbar - Minimal Design === */
+scrollbar {
+  background: transparent;
+}
+
+scrollbar slider {
+  background: var(--raycast-text-quaternary);
+  border-radius: 10px;
+  min-width: 6px;
+  min-height: 40px;
+  margin: 2px;
+  transition: all 0.15s ease;
+}
+
+scrollbar slider:hover {
+  background: var(--raycast-text-tertiary);
+  min-width: 8px;
+}
+
+scrollbar slider:active {
+  background: var(--raycast-primary);
+}
+
+/* === Box Container - Smooth Layout === */
+box {
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* === Better text rendering === */
+label,
+entry {
+  -gtk-font-smoothing: antialiased;
+  font-feature-settings: "liga" 1, "kern" 1;
+}
+
+/* === Focus ring removal === */
+* {
+  outline: none;
+}
+
+/* === Divider between search and results === */
+scrolledwindow {
+  margin-top: 0;
+}
+
+/* === Entry text === */
+entry text {
+  color: var(--raycast-text-primary);
+}
+
+/* === Additional Polish === */
+listbox row {
+  margin: 2px 8px;
+}
+
+/* First item styling */
+listbox row:first-child {
+  margin-top: 8px;
+}
+
+/* Last item styling */
+listbox row:last-child {
+  margin-bottom: 8px;
+}
+
+/* Subtle background gradient for window */
+window {
+  background: linear-gradient(
+    180deg,
+    var(--raycast-bg-primary) 0%,
+    #18181a 100%
+  );
+}
