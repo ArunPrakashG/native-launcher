@@ -41,6 +41,11 @@ impl DesktopScanner {
         self.search_paths.push(path);
     }
 
+    /// Get the configured search paths
+    pub fn paths(&self) -> &[PathBuf] {
+        &self.search_paths
+    }
+
     /// Scan all configured paths and return desktop entries
     pub fn scan(&self) -> Result<Vec<DesktopEntry>> {
         info!("Starting desktop file scan");

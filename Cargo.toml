@@ -7,6 +7,14 @@ description = "A modern application launcher for Linux with Wayland support"
 license = "MIT"
 repository = "https://github.com/yourusername/native-launcher"
 
+[[bin]]
+name = "native-launcher"
+path = "src/main.rs"
+
+[lib]
+name = "native_launcher"
+path = "src/lib.rs"
+
 [dependencies]
 # GUI framework - GTK4 for rendering
 gtk4 = "0.9"

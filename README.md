@@ -73,6 +73,8 @@ cargo build --release
 sudo cp target/release/native-launcher /usr/local/bin/
 ```
 
+See [RUNNING.md](RUNNING.md) for detailed build and execution instructions.
+
 ### Package Managers
 
 _Coming soon: AUR, .deb, .rpm packages_
@@ -88,6 +90,8 @@ _Coming soon: AUR, .deb, .rpm packages_
    ```
 
 2. **Keyboard Shortcut:** Configure in your compositor to open on `Super+Space`
+   
+   See [HOTKEY_SETUP.md](HOTKEY_SETUP.md) for detailed setup instructions for all compositors.
 
 3. **Search & Launch:**
    - Type to search applications
@@ -254,7 +258,17 @@ ls /usr/share/applications/
 ls ~/.local/share/applications/
 ```
 
-For more issues, see [docs/troubleshooting.md](docs/troubleshooting.md) or open an issue.
+For more issues, see [TESTING.md](TESTING.md) or open an issue.
+
+## Documentation
+
+- **[RUNNING.md](RUNNING.md)** - Building, running, and testing the launcher
+- **[HOTKEY_SETUP.md](HOTKEY_SETUP.md)** - Setting up global keyboard shortcuts
+- **[RAYCAST_DESIGN.md](RAYCAST_DESIGN.md)** - Design language and visual style
+- **[TESTING.md](TESTING.md)** - Comprehensive testing guide
+- **[CHANGES.md](CHANGES.md)** - Recent changes and fixes
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - How to contribute
+- **[plans.md](plans.md)** - Development roadmap
 
 ## License
 
@@ -264,6 +278,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - Thanks to the Rust and GTK communities
 - Inspired by the excellent work on Rofi, Wofi, and Hyprshell
+- Design inspired by [Raycast](https://www.raycast.com/)
 - Built on the freedesktop.org specifications
 
 ## Contact
