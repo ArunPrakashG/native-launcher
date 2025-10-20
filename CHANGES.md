@@ -3,6 +3,7 @@
 ## Overview
 
 This update includes two major improvements:
+
 1. **Fixed Application Launching** - Applications now properly launch and stay running
 2. **Raycast Design Language** - Complete UI redesign to match Raycast's aesthetic
 
@@ -11,7 +12,9 @@ This update includes two major improvements:
 ### 1. Application Execution Fix (`src/utils/exec.rs`)
 
 #### Problem
+
 Applications were not launching properly due to:
+
 - Child processes being killed when launcher exited
 - Improper handling of Desktop Entry field codes
 - Incorrect terminal emulator command syntax
@@ -19,6 +22,7 @@ Applications were not launching properly due to:
 #### Solution
 
 **Process Detachment**:
+
 ```rust
 // Before: Simple spawn
 Command::new("sh").arg("-c").arg(exec).spawn()
@@ -35,12 +39,14 @@ Command::new("sh")
 ```
 
 **Improved Command Cleaning**:
+
 - Properly removes all Desktop Entry field codes (%f, %u, %i, etc.)
 - Handles quoted strings correctly
 - Normalizes whitespace
 - Added empty command detection
 
 **Terminal-Specific Syntax**:
+
 ```rust
 match terminal.as_str() {
     "alacritty" => format!("{} -e sh -c '{}'", terminal, exec),
@@ -51,6 +57,7 @@ match terminal.as_str() {
 ```
 
 **Added Logging**:
+
 - Info-level for successful launches
 - Warn-level for empty commands
 - Error-level for failures
@@ -61,43 +68,50 @@ match terminal.as_str() {
 #### Complete CSS Rewrite
 
 **Color Palette Change**:
+
 ```css
 /* Before: Blue glassmorphism */
 --primary: rgba(100, 150, 255, 1);
 --bg-primary: rgba(30, 30, 35, 0.95);
 
 /* After: Raycast coral/charcoal */
---raycast-primary: #FF6363;
---raycast-bg-primary: #1C1C1E;
+--raycast-primary: #ff6363;
+--raycast-bg-primary: #1c1c1e;
 ```
 
 **Window Styling**:
+
 - Removed: Gradient backgrounds, backdrop blur, multiple shadows
 - Added: Solid dark background, single strong shadow, subtle gradient
 - Border radius: 20px → 16px (less rounded)
 
 **Search Entry**:
+
 - Removed: Gradient background, transform on focus, multiple shadows
 - Added: Flat secondary background, red border focus, simple outer glow
 - Padding: More compact (18px → 14px vertical)
 
 **Result Items**:
+
 - Removed: Gradient backgrounds, glowing effects, scale/translate transforms
 - Added: Flat colors, simple background changes, no transforms
 - Selected: Solid coral background instead of gradient with glow
 - Hover: Just background color change, no motion
 
 **Typography**:
+
 - Removed: Text shadows, heavy font weights
 - Added: Clean flat text, subtle weight differences
 - Font weight: 400 (regular), 500 (medium), 600 (selected)
 
 **Animations**:
+
 - Duration: 0.25-0.3s → 0.15s (2x faster)
 - Effects: Color changes only (no transforms)
 - Removed: Pulse animations, fade/slide keyframes
 
 **Scrollbar**:
+
 - Width: 8px → 6px (more minimal)
 - Colors: White tints → Text color variables
 - Active state: Blue → Red (matches primary)
@@ -105,38 +119,43 @@ match terminal.as_str() {
 ## File Changes
 
 ### Modified Files
+
 1. `src/utils/exec.rs` - Complete rewrite of execution logic
 2. `src/ui/style.css` - Complete redesign with Raycast colors
 
 ### New Documentation Files
+
 1. `RAYCAST_DESIGN.md` - Design language documentation
 2. `TESTING.md` - Comprehensive testing guide
 3. `CHANGES.md` - This file
 
 ### Updated Files
+
 1. `README.md` - Updated feature descriptions and design section
 
 ## Visual Comparison
 
-| Element | Before | After |
-|---------|--------|-------|
-| **Window** | Semi-transparent gradient with blur | Solid dark charcoal |
-| **Accent Color** | Electric blue (#6496FF) | Coral red (#FF6363) |
-| **Search Bar** | Glowing blue gradient | Flat dark with red focus |
-| **Selection** | Blue gradient with glow effects | Solid red background |
-| **Hover** | Scale + translate + shadow | Background color only |
-| **Borders** | Colored glowing | Subtle dark gray |
-| **Shadows** | Multi-layer (3-4 layers) | Single window shadow |
-| **Animation** | 0.25-0.3s with transforms | 0.15s color only |
+| Element          | Before                              | After                    |
+| ---------------- | ----------------------------------- | ------------------------ |
+| **Window**       | Semi-transparent gradient with blur | Solid dark charcoal      |
+| **Accent Color** | Electric blue (#6496FF)             | Coral red (#FF6363)      |
+| **Search Bar**   | Glowing blue gradient               | Flat dark with red focus |
+| **Selection**    | Blue gradient with glow effects     | Solid red background     |
+| **Hover**        | Scale + translate + shadow          | Background color only    |
+| **Borders**      | Colored glowing                     | Subtle dark gray         |
+| **Shadows**      | Multi-layer (3-4 layers)            | Single window shadow     |
+| **Animation**    | 0.25-0.3s with transforms           | 0.15s color only         |
 
 ## Testing Results
 
 ### Build Status
+
 ✅ Compiles successfully with 6 warnings (unused methods)
 ✅ Release build completes in ~12 seconds
 ✅ No errors or critical warnings
 
 ### Expected Behavior
+
 ✅ Applications launch and stay running
 ✅ Launcher closes after launch
 ✅ Terminal apps work correctly
@@ -153,12 +172,14 @@ match terminal.as_str() {
 ## Compatibility
 
 ### Requirements
+
 - Wayland compositor with layer-shell support
 - GTK4 >= 4.0
 - gtk4-layer-shell >= 0.4
 - Linux with setsid command (all modern distros)
 
 ### Tested With
+
 - Rust 1.75+
 - Cargo build system
 - Standard Linux desktop file structure
@@ -166,9 +187,11 @@ match terminal.as_str() {
 ## Migration Notes
 
 ### For Users
+
 No action needed - just rebuild and run. The new design and fixes are automatic.
 
 ### For Developers
+
 - CSS variables now use `--raycast-*` prefix
 - Removed animation keyframes (fadeIn, slideIn, pulse)
 - Execution uses `setsid -f` for all launches
@@ -176,6 +199,7 @@ No action needed - just rebuild and run. The new design and fixes are automatic.
 ## Known Issues
 
 None currently. All previous issues resolved:
+
 - ✅ Apps not launching
 - ✅ Process termination on exit
 - ✅ Terminal app execution
