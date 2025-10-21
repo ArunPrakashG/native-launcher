@@ -65,6 +65,10 @@ impl Plugin for CalculatorPlugin {
         "Evaluate mathematical expressions"
     }
 
+    fn command_prefixes(&self) -> Vec<&str> {
+        vec!["@cal"]
+    }
+
     fn should_handle(&self, query: &str) -> bool {
         self.enabled && Self::is_math_expression(query)
     }

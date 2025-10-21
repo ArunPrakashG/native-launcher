@@ -80,14 +80,14 @@ impl PluginManager {
     }
 
     /// Search across all plugins
-    /// If query starts with @, route to specific plugin(s)
+    /// If query starts with @ or $, route to specific plugin(s) matching the command prefix
     /// Otherwise, perform global search across all plugins
     pub fn search(&self, query: &str, max_results: usize) -> Result<Vec<PluginResult>> {
         let context = PluginContext::new(max_results);
         let mut all_results = Vec::new();
 
-        // Check if query starts with @ command
-        let is_command_query = query.starts_with('@');
+        // Check if query starts with @ or $ command prefix
+        let is_command_query = query.starts_with('@') || query.starts_with('$');
 
         if is_command_query {
             // Command-based search: only query plugins that match the command prefix

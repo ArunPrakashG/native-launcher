@@ -42,6 +42,16 @@ sudo install -Dm755 target/release/native-launcher /usr/local/bin/
 5. **Launch**: Press `Enter`
 6. **Web Search**: Press `Ctrl+Enter` to search the web
 
+**Command Prefixes**: Use `@` commands to search specific plugins:
+
+- `@app <query>` - Search applications only
+- `@cal <expression>` - Calculate mathematical expressions
+- `@code`, `@zed`, `@editor` - Search editor workspaces
+- `@files` - Search recent files and directories
+- `@shell <cmd>` or `$ <cmd>` - Execute shell commands
+- `@ssh <host>` - Connect to SSH hosts
+- `@web <query>` - Web search
+
 **Full usage guide**: See [Wiki: Quick Start](https://github.com/ArunPrakashG/native-launcher/wiki/Quick-Start)
 
 ## Documentation

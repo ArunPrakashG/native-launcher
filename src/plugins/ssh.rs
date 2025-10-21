@@ -216,6 +216,10 @@ impl Plugin for SshPlugin {
         "SSH connection launcher"
     }
 
+    fn command_prefixes(&self) -> Vec<&str> {
+        vec!["@ssh"]
+    }
+
     fn priority(&self) -> i32 {
         700 // Between shell (800) and web search (600)
     }
@@ -229,8 +233,9 @@ impl Plugin for SshPlugin {
             return false;
         }
 
-        // Trigger on "ssh" prefix or if query matches host name
-        query.starts_with("ssh")
+        // Trigger on "@ssh" prefix or "ssh" prefix or if query matches host name
+        query.starts_with("@ssh")
+            || query.starts_with("ssh")
             || self.hosts.iter().any(|h| {
                 h.name.to_lowercase().contains(&query.to_lowercase())
                     || h.hostname.to_lowercase().contains(&query.to_lowercase())
@@ -244,7 +249,8 @@ impl Plugin for SshPlugin {
 
         let query_lower = query.to_lowercase();
         let search_query = query_lower
-            .strip_prefix("ssh")
+            .strip_prefix("@ssh")
+            .or_else(|| query_lower.strip_prefix("ssh"))
             .unwrap_or(&query_lower)
             .trim();
 

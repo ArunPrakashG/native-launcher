@@ -400,7 +400,7 @@ impl Plugin for EditorsPlugin {
     }
 
     fn command_prefixes(&self) -> Vec<&str> {
-        vec!["@workspace", "@wp", "@project", "@code", "@editor"]
+        vec!["@code", "@zed", "@editor"]
     }
 
     fn priority(&self) -> i32 {
@@ -431,10 +431,8 @@ impl Plugin for EditorsPlugin {
         // Extract search term
         let search_term = if query.starts_with('@') {
             query_lower
-                .strip_prefix("@workspace")
-                .or_else(|| query_lower.strip_prefix("@wp"))
-                .or_else(|| query_lower.strip_prefix("@project"))
-                .or_else(|| query_lower.strip_prefix("@code"))
+                .strip_prefix("@code")
+                .or_else(|| query_lower.strip_prefix("@zed"))
                 .or_else(|| query_lower.strip_prefix("@editor"))
                 .unwrap_or(&query_lower)
                 .trim()

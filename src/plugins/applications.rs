@@ -107,6 +107,10 @@ impl Plugin for ApplicationsPlugin {
         "Search installed desktop applications"
     }
 
+    fn command_prefixes(&self) -> Vec<&str> {
+        vec!["@app"]
+    }
+
     fn should_handle(&self, _query: &str) -> bool {
         // Applications plugin handles all queries (fallback)
         true

@@ -103,7 +103,11 @@ impl Plugin for WebSearchPlugin {
     }
 
     fn description(&self) -> &str {
-        "Quick web searches (e.g., 'google rust', 'wiki linux')"
+        "Quick web searches (e.g., '@web rust', 'google linux')"
+    }
+
+    fn command_prefixes(&self) -> Vec<&str> {
+        vec!["@web"]
     }
 
     fn should_handle(&self, query: &str) -> bool {
@@ -116,8 +120,11 @@ impl Plugin for WebSearchPlugin {
             return Ok(vec![]);
         }
 
+        // Strip @web prefix if present
+        let clean_query = query.strip_prefix("@web").unwrap_or(query).trim();
+
         // Try to parse as explicit web search (e.g., "google query")
-        if let Some((engine, search_term)) = self.parse_query(query) {
+        if let Some((engine, search_term)) = self.parse_query(clean_query) {
             let url = match self.build_url(engine, &search_term) {
                 Some(u) => u,
                 None => return Ok(vec![]),
@@ -138,16 +145,16 @@ impl Plugin for WebSearchPlugin {
 
         // Fallback: Offer Google search for any query (lower priority)
         // This ensures there's always a web search option even if no results match
-        let url = self.build_url("google", query).unwrap_or_else(|| {
+        let url = self.build_url("google", clean_query).unwrap_or_else(|| {
             format!(
                 "https://www.google.com/search?q={}",
-                urlencoding::encode(query)
+                urlencoding::encode(clean_query)
             )
         });
         let command = format!("xdg-open '{}'", url);
 
         Ok(vec![PluginResult::new(
-            format!("Search Google for '{}'", query),
+            format!("Search Google for '{}'", clean_query),
             command,
             self.name().to_string(),
         )

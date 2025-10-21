@@ -37,20 +37,35 @@ impl Plugin for ShellPlugin {
     }
 
     fn description(&self) -> &str {
-        "Execute shell commands (prefix with >)"
+        "Execute shell commands (prefix with @shell or $)"
+    }
+
+    fn command_prefixes(&self) -> Vec<&str> {
+        vec!["@shell", "$"]
     }
 
     fn should_handle(&self, query: &str) -> bool {
-        self.enabled && query.starts_with(&self.prefix)
+        self.enabled
+            && (query.starts_with("@shell")
+                || query.starts_with('$')
+                || query.starts_with(&self.prefix))
     }
 
     fn search(&self, query: &str, _context: &PluginContext) -> Result<Vec<PluginResult>> {
-        if !self.enabled || !query.starts_with(&self.prefix) {
+        if !self.enabled {
             return Ok(vec![]);
         }
 
-        // Remove prefix
-        let command = query[self.prefix.len()..].trim();
+        // Remove prefix - support @shell, $, or custom prefix
+        let command = if query.starts_with("@shell") {
+            query["@shell".len()..].trim()
+        } else if query.starts_with('$') {
+            query[1..].trim()
+        } else if query.starts_with(&self.prefix) {
+            query[self.prefix.len()..].trim()
+        } else {
+            return Ok(vec![]);
+        };
 
         if command.is_empty() {
             return Ok(vec![]);

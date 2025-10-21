@@ -266,7 +266,7 @@ impl Plugin for FileBrowserPlugin {
     }
 
     fn command_prefixes(&self) -> Vec<&str> {
-        vec!["@recent", "@file", "@workspace", "@wp", "@project", "@code"]
+        vec!["@files"]
     }
 
     fn priority(&self) -> i32 {
