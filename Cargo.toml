@@ -67,6 +67,14 @@ urlencoding = "2.1"
 [dev-dependencies]
 criterion = "0.5"
 
+[[bench]]
+name = "search_benchmark"
+harness = false
+
+[[bench]]
+name = "startup_benchmark"
+harness = false
+
 [profile.release]
 opt-level = 3
 lto = true

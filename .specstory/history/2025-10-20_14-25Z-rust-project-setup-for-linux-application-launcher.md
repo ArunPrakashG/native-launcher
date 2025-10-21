@@ -6299,7 +6299,7 @@ This helps identify problematic plugins immediately and maintain launcher perfor
 
 ---
 
-_**User (2025-10-21 14:23Z)**_
+_**User (2025-10-21 14:26Z)**_
 
 add wiki doc for this, also update readme if needed
 
@@ -6307,7 +6307,281 @@ add wiki doc for this, also update readme if needed
 
 _**Assistant (copilot/claude-sonnet-4.5)**_
 
-I'll add wiki documentation for the plugin metrics 
+I'll add wiki documentation for the plugin metrics feature and update the README if needed. Now let's update the wiki Home page to include the performance monitoring link: 
+```
+
+```
+Now let's check if the README needs updating: 
+```
+
+```
+Now let's commit the wiki changes: Perfect! Now let's update the main repository to track the wiki changes and commit the README update: We should exclude the build artifacts from the example plugin. Let me also stage the properly modified files: The summary file was probably cleaned up. Let's just commit what we have: I see there are modified and deleted files. Let me add the changed files properly: Perfect! Let me create a comprehensive summary of everything that was done:
+
+## ✅ Complete! Wiki Documentation and README Updated
+
+I've successfully added comprehensive wiki documentation for the plugin performance monitoring feature and updated the README.
+
+### 📚 Wiki Documentation Added
+
+**New Page**: `Plugin-Performance.md` (340+ lines)
+
+Comprehensive guide covering:
+
+1. **Overview** - What metrics are tracked
+2. **Performance Thresholds** - Normal/Slow/Very Slow definitions
+3. **UI Warnings** - Visual display of slow plugins
+4. **Viewing Metrics**:
+   - Console logs (info level)
+   - Aggregate statistics
+   - Slow plugin warnings
+   - Debug mode
+5. **Understanding Slow Plugins**:
+   - Common causes
+   - What to do about them
+6. **Optimization Guide** for plugin developers:
+   - Lazy initialization
+   - Reducing dependencies
+   - Compilation optimizations
+   - Async vs sync choices
+   - Profiling techniques
+7. **Benchmarking** - How to test plugin performance
+8. **Troubleshooting** - Common issues and solutions
+9. **Reporting Issues** - What to include in bug reports
+10. **Future Enhancements** - Planned features
+
+### 🔗 Wiki Updates
+
+**Updated `Home.md`**:
+- Added "Plugin Performance" link to Development section
+- Positioned between "Dynamic Plugins" and "Architecture"
+
+### 📝 README Updates
+
+**Updated `README.md`**:
+- Added "Performance monitoring" bullet to Dynamic Plugin System section
+- Now mentions: "Built-in metrics and warnings for slow plugins"
+
+### 📊 Documentation Highlights
+
+**For Users**:
+```bash
+# See plugin metrics
+RUST_LOG=info native-launcher
+
+# Output:
+INFO  Loaded plugin 'Example' (priority: 200, load_time: 2.3ms, size: 418 KB)
+INFO  Plugin metrics: total_load_time=15.4ms, avg_load_time=5.1ms, total_memory=1.2 MB
+WARN  Detected 1 slow plugins (>50ms load time):
+WARN    - slow_plugin.so took 87.3ms
+```
+
+**UI Warning Display**:
+```
+┌──────────────────────────────────────────┐
+│ ⚠️ 2 slow plugins detected (>50ms load) │
+├──────────────────────────────────────────┤
+│ [Search input]                           │
+```
+
+**For Developers** - Optimization tips:
+- ✅ Lazy initialization
+- ✅ Reduce dependencies
+- ✅ Optimize compilation flags
+- ✅ Profile plugin load time
+- ✅ Target <5ms load time
+
+### 🎯 Performance Targets
+
+| Status | Load Time | UI Warning |
+|--------|-----------|-----------|
+| ✅ Excellent | <5ms | No |
+| ⚠️ Acceptable | 5-10ms | No |
+| 🔴 Slow | >10ms | Logged |
+| 🔴 Very Slow | >50ms | **Yes** |
+
+### 📦 Commits
+
+**Wiki commit**:
+```
+docs: Add plugin performance monitoring guide
+
+- Added comprehensive Plugin-Performance.md guide
+- Covers metrics tracking, UI warnings, optimization tips
+- Includes troubleshooting and benchmarking guides
+- Updated Home.md with Plugin Performance link
+```
+
+**Pushed to GitHub wiki**: ✅
+
+### 🔗 Access Documentation
+
+- **Wiki**: https://github.com/ArunPrakashG/native-launcher/wiki/Plugin-Performance
+- **Home**: https://github.com/ArunPrakashG/native-launcher/wiki
+- **README**: Updated with performance monitoring feature
+
+### 📋 What's Documented
+
+1. ✅ Performance metrics tracking explained
+2. ✅ UI warning system described
+3. ✅ Log output examples provided
+4. ✅ Optimization guide for developers
+5. ✅ Troubleshooting common issues
+6. ✅ Benchmarking methodology
+7. ✅ Performance targets defined
+8. ✅ Future enhancement roadmap
+
+The complete plugin performance monitoring system is now fully documented and accessible to users and developers! 🚀
+
+---
+
+_**User (2025-10-21 14:43Z)**_
+
+can we introduce commands for plugins?
+@app {app specific query}
+@cal {maths}
+@code
+@zed
+@editor
+@files
+@shell or $
+@ssh
+@web
+
+if nothing is specified, search fully, display full results sorted in priority wise.
+right now i cant see vs code workspaces or recently opened directories, there is some bug
+
+---
+
+_**Assistant (copilot/claude-sonnet-4.5)**_
+
+I'll help you implement plugin-specific commands and fix the VS Code workspaces/recent directories issue. Let me start by understanding the current state and then implement the changes. Let me start by investigating the VS Code workspaces issue: Now let me check the search engine to understand how queries are processed: Now let me check the main.rs to see how the search engine is integrated: Let me see how the plugin manager search works: Now let me check if the editors plugin has the command_prefixes method: Good! Now let me check the trait to understand the full interface: Now let me run the app with debug logging to see what's happening: The app is compiling. Let me wait for it to run and see the debug output. Let me check the terminal again: Let me check files plugin to see all command prefixes: Now let me check what command prefixes each plugin has and update them to match your requirements. Let me complete the investigation: Now let me check each plugin and update their command prefixes. Let me start with applications plugin: 
+```
+
+```
+Now let me check and update calculator plugin: 
+```
+
+```
+Now let's update the editors plugin - it already has command_prefixes, let me update them: 
+```
+
+```
+Now let me also update the search logic in editors plugin to handle the new prefixes: 
+```
+
+```
+Now let me check and update the files plugin: 
+```
+
+```
+Now let me check the shell plugin: 
+```
+
+```
+Now let me check the SSH plugin: 
+```
+
+```
+Now let me also update the should_handle and search functions to support the @ssh prefix: 
+```
+
+```
+Now let me check the web search plugin: 
+```
+
+```
+Now I need to update the web search plugin to handle the @web prefix: 
+```
+
+```
+
+```
+
+```
+Now let me update the manager to improve the command routing and update the todo list: Now let me review and improve the manager's search logic to ensure it properly handles the command routing: The manager looks good. Now let me check if the shell plugin also needs to handle the $ prefix without @ symbol: I see the issue - the manager only checks for @ prefix, but we want $ to also work for shell commands. Let me update the manager: 
+```
+
+```
+Now let me build and test the application: Great! The build succeeded. Now let me create documentation for these command prefixes. Let me update the README: Now let me add a section about command prefixes in the README: 
+```
+
+```
+Perfect! Now let me complete the todo and create a summary document. Let me first check if there's a dedicated keyboard shortcuts or usage documentation file I should update: Let me update the Keyboard Shortcuts wiki page: Now let me update this to reflect the new command prefixes: 
+```
+
+```
+
+```
+
+```
+Now let me also update the section about search modifiers: 
+```
+
+```
+Now let me update the Tips section: 
+```
+
+```
+Perfect! Now let me commit all these changes: Let me check what files were modified: Good! Now let me commit these changes: Excellent! Now let me create a summary document for you: 
+
+---
+
+_**User (2025-10-21 14:41Z)**_
+
+proceed on next phase
+
+---
+
+_**Assistant (copilot/claude-sonnet-4.5)**_
+
+I'll help you proceed to the next phase! Looking at the `plans.md` file, let me check what's been completed and what's next. Looking at the `plans.md` file, I can see that **Phase 3** is mostly complete with great progress! Here's the current state:
+
+## Completed in Phase 3 ✅
+- Desktop actions (inline display)
+- Terminal app support with auto-detection
+- Custom CSS theming (5 example themes)
+- Plugin system with 7 working plugins
+- Command prefix support (@app, @cal, @code, etc.)
+- Desktop file caching and background watcher
+- SSH and Files plugins with workspace detection
+
+## What's Next?
+
+I see three good options for the next phase:
+
+### Option 1: **Complete Phase 3 Performance Work** 🎯
+- Memory profiling and optimization
+- Expand benchmarks suite
+- Search indexing optimization
+- Verify <50ms search target
+
+### Option 2: **Phase 5 - Window Switcher** 🪟 (Recommended)
+- Build a window switcher plugin for Wayland
+- Show active windows with previews
+- Quick Alt+Tab alternative
+- Integrate with compositor APIs
+
+### Option 3: **Phase 5 - Dynamic Plugin System** 🔌
+- Build external plugin loading (`.so` files)
+- Create plugin SDK/template
+- Enable community plugin development
+- Plugin marketplace foundation
+
+**My recommendation**: Let's build the **Window Switcher** plugin! It's a high-value feature that would make Native Launcher a true "everything launcher" for Wayland users - combining app launching with window management.
+
+Which direction would you like to go? Or do you have a different feature in mind?
+
+---
+
+_**User (2025-10-21 14:42Z)**_
+
+optrion 1
+
+---
+
+_**Assistant (copilot/claude-sonnet-4.5)**_
+
+Perfect! Let's complete Phase 3 performance work. I'll focus on memory profiling, expanding benchmarks, and verifying our performance targets. Let me first check what benchmarks we already have: Good! We have comprehensive search benchmarks. Now let me run them to see current performance: 
 
 ---
 
