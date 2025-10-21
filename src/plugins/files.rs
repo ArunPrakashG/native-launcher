@@ -318,16 +318,23 @@ impl Plugin for FileBrowserPlugin {
                 query_lower.trim()
             };
 
+            // For global search (no @ command), only show files if query is short (3 chars or less)
+            // or if there's a match. This prevents file spam in normal app searches.
+            let show_all_files =
+                is_file_command || search_term.is_empty() || search_term.len() <= 3;
+
             for file in &self.recent_files {
-                // Filter by search term
-                if !search_term.is_empty()
-                    && !file.name.to_lowercase().contains(search_term)
-                    && !file
+                // Filter by search term - but be more permissive for short queries
+                let matches = search_term.is_empty()
+                    || file.name.to_lowercase().contains(search_term)
+                    || file
                         .path
                         .to_string_lossy()
                         .to_lowercase()
-                        .contains(search_term)
-                {
+                        .contains(search_term);
+
+                // Skip non-matching files unless we're showing all
+                if !show_all_files && !matches {
                     continue;
                 }
 
@@ -338,13 +345,27 @@ impl Plugin for FileBrowserPlugin {
                     .and_then(|p| p.to_str())
                     .map(String::from);
 
+                // Score based on match quality
+                let score = if matches && !search_term.is_empty() {
+                    if file.name.to_lowercase() == search_term {
+                        750 // Exact match
+                    } else if file.name.to_lowercase().starts_with(search_term) {
+                        720 // Prefix match
+                    } else {
+                        700 // Contains match
+                    }
+                } else {
+                    // No filter active, lower score to not interfere with app results
+                    550
+                };
+
                 results.push(PluginResult {
                     title: file.name.clone(),
                     subtitle,
                     icon: Some(icon),
                     command: format!("xdg-open '{}'", file.path.display()),
                     terminal: false,
-                    score: 700,
+                    score,
                     plugin_name: self.name().to_string(),
                     sub_results: Vec::new(),
                     parent_app: None,

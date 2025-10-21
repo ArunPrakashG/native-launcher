@@ -42,6 +42,30 @@ sudo install -Dm755 target/release/native-launcher /usr/local/bin/
 5. **Launch**: Press `Enter`
 6. **Web Search**: Press `Ctrl+Enter` to search the web
 
+### User Directories
+
+Native Launcher stores configuration and data in standard XDG directories:
+
+**Configuration:**
+
+- `~/.config/native-launcher/config.toml` - Main configuration file
+- `~/.config/native-launcher/plugins/` - Dynamic plugins directory (`.so` files)
+
+**Cache & Data:**
+
+- `~/.cache/native-launcher/entries.cache` - Desktop entries cache
+- `~/.cache/native-launcher/icons.cache` - Icon paths cache
+- `~/.local/share/native-launcher/usage.bin` - Application usage statistics
+
+**First Run:**
+On first launch, Native Launcher will automatically:
+
+1. Create the config directory with default `config.toml`
+2. Scan system applications from `/usr/share/applications` and `~/.local/share/applications`
+3. Build icon and entry caches for fast subsequent startups
+
+To reset to defaults, simply delete `~/.config/native-launcher/` and the cache files will be regenerated.
+
 **Command Prefixes**: Use `@` commands to search specific plugins:
 
 - `@app <query>` - Search applications only

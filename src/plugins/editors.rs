@@ -18,17 +18,49 @@ struct RecentWorkspace {
     command: String,
 }
 
-/// VS Code storage.json structure (partial)
+/// VS Code storage.json structure (partial) - supports both old and new formats
 #[derive(Debug, Deserialize)]
 struct VSCodeStorage {
+    // Old format (pre-2023)
     #[serde(rename = "openedPathsList")]
     opened_paths_list: Option<OpenedPathsList>,
+
+    // New format (2023+)
+    #[serde(rename = "backupWorkspaces")]
+    backup_workspaces: Option<BackupWorkspaces>,
+
+    // Profile associations (newest format)
+    #[serde(rename = "profileAssociations")]
+    profile_associations: Option<ProfileAssociations>,
 }
 
 #[derive(Debug, Deserialize)]
 struct OpenedPathsList {
     workspaces3: Option<Vec<String>>,
     folders2: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct BackupWorkspaces {
+    workspaces: Option<Vec<WorkspaceEntry>>,
+    folders: Option<Vec<FolderEntry>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct WorkspaceEntry {
+    #[serde(rename = "workspaceUri")]
+    workspace_uri: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct FolderEntry {
+    #[serde(rename = "folderUri")]
+    folder_uri: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct ProfileAssociations {
+    workspaces: Option<std::collections::HashMap<String, String>>,
 }
 
 /// Plugin for code editor workspace detection
@@ -129,72 +161,218 @@ impl EditorsPlugin {
             .join("globalStorage")
             .join("storage.json");
 
+        debug!(
+            "Looking for {} storage at: {}",
+            editor_name,
+            config_path.display()
+        );
+
         if config_path.exists() {
             let content = match fs::read_to_string(&config_path) {
                 Ok(c) => c,
-                Err(_) => return Ok(workspaces),
+                Err(e) => {
+                    warn!("Failed to read {}: {}", config_path.display(), e);
+                    return Ok(workspaces);
+                }
             };
 
             let storage = match serde_json::from_str::<VSCodeStorage>(&content) {
                 Ok(s) => s,
-                Err(_) => return Ok(workspaces),
+                Err(e) => {
+                    warn!("Failed to parse {} storage.json: {}", editor_name, e);
+                    return Ok(workspaces);
+                }
             };
 
-            let Some(opened_paths) = storage.opened_paths_list else {
-                return Ok(workspaces);
-            };
+            // Try new format first (backupWorkspaces - 2023+)
+            if let Some(backup) = storage.backup_workspaces {
+                debug!("{} using backupWorkspaces format", editor_name);
 
-            // Process workspace files (.code-workspace)
-            if let Some(workspace_paths) = opened_paths.workspaces3 {
-                for workspace_uri in workspace_paths.iter().take(max_count) {
-                    let Some(path) = Self::parse_vscode_uri(workspace_uri) else {
-                        continue;
-                    };
+                // Process workspace entries
+                if let Some(workspace_entries) = backup.workspaces {
+                    debug!(
+                        "{} has {} workspace entries",
+                        editor_name,
+                        workspace_entries.len()
+                    );
+                    for entry in workspace_entries.iter().take(max_count) {
+                        debug!("Processing workspace URI: {}", entry.workspace_uri);
+                        let Some(path) = Self::parse_vscode_uri(&entry.workspace_uri) else {
+                            debug!("Failed to parse URI: {}", entry.workspace_uri);
+                            continue;
+                        };
 
-                    if !path.exists() {
-                        continue;
+                        if !path.exists() {
+                            debug!("Workspace path doesn't exist: {}", path.display());
+                            continue;
+                        }
+
+                        let name = path
+                            .file_stem()
+                            .and_then(|n| n.to_str())
+                            .unwrap_or("Unknown")
+                            .to_string();
+
+                        debug!("Added workspace: {} at {}", name, path.display());
+                        workspaces.push(RecentWorkspace {
+                            path: path.clone(),
+                            name,
+                            editor: editor_name.to_string(),
+                            command: format!("{} '{}'", command, path.display()),
+                        });
                     }
+                }
 
-                    let name = path
-                        .file_stem()
-                        .and_then(|n| n.to_str())
-                        .unwrap_or("Unknown")
-                        .to_string();
+                // Process folder entries (recently opened directories)
+                if let Some(folder_entries) = backup.folders {
+                    debug!(
+                        "{} has {} folder entries",
+                        editor_name,
+                        folder_entries.len()
+                    );
+                    for entry in folder_entries.iter().take(max_count) {
+                        debug!("Processing folder URI: {}", entry.folder_uri);
+                        let Some(path) = Self::parse_vscode_uri(&entry.folder_uri) else {
+                            debug!("Failed to parse URI: {}", entry.folder_uri);
+                            continue;
+                        };
 
-                    workspaces.push(RecentWorkspace {
-                        path: path.clone(),
-                        name,
-                        editor: editor_name.to_string(),
-                        command: format!("{} '{}'", command, path.display()),
-                    });
+                        if !path.exists() {
+                            debug!("Folder path doesn't exist: {}", path.display());
+                            continue;
+                        }
+
+                        let name = path
+                            .file_name()
+                            .and_then(|n| n.to_str())
+                            .unwrap_or("Unknown")
+                            .to_string();
+
+                        debug!("Added folder: {} at {}", name, path.display());
+                        workspaces.push(RecentWorkspace {
+                            path: path.clone(),
+                            name,
+                            editor: editor_name.to_string(),
+                            command: format!("{} '{}'", command, path.display()),
+                        });
+                    }
                 }
             }
+            // Try profile associations (newest format)
+            else if let Some(profiles) = storage.profile_associations {
+                debug!("{} using profileAssociations format", editor_name);
 
-            // Process regular folders
-            if let Some(folder_paths) = opened_paths.folders2 {
-                for folder_uri in folder_paths.iter().take(max_count) {
-                    let Some(path) = Self::parse_vscode_uri(folder_uri) else {
-                        continue;
-                    };
+                if let Some(workspace_map) = profiles.workspaces {
+                    debug!(
+                        "{} has {} workspace associations",
+                        editor_name,
+                        workspace_map.len()
+                    );
+                    for (workspace_uri, _profile) in workspace_map.iter().take(max_count) {
+                        debug!("Processing workspace URI: {}", workspace_uri);
+                        let Some(path) = Self::parse_vscode_uri(workspace_uri) else {
+                            debug!("Failed to parse URI: {}", workspace_uri);
+                            continue;
+                        };
 
-                    if !path.exists() {
-                        continue;
+                        if !path.exists() {
+                            debug!("Workspace path doesn't exist: {}", path.display());
+                            continue;
+                        }
+
+                        let name = path
+                            .file_name()
+                            .and_then(|n| n.to_str())
+                            .unwrap_or("Unknown")
+                            .to_string();
+
+                        debug!("Added workspace: {} at {}", name, path.display());
+                        workspaces.push(RecentWorkspace {
+                            path: path.clone(),
+                            name,
+                            editor: editor_name.to_string(),
+                            command: format!("{} '{}'", command, path.display()),
+                        });
                     }
-
-                    let name = path
-                        .file_name()
-                        .and_then(|n| n.to_str())
-                        .unwrap_or("Unknown")
-                        .to_string();
-
-                    workspaces.push(RecentWorkspace {
-                        path: path.clone(),
-                        name,
-                        editor: editor_name.to_string(),
-                        command: format!("{} '{}'", command, path.display()),
-                    });
                 }
             }
+            // Try old format (openedPathsList - pre-2023)
+            else if let Some(opened_paths) = storage.opened_paths_list {
+                debug!("{} using openedPathsList format", editor_name);
+
+                // Process workspace files (.code-workspace)
+                if let Some(workspace_paths) = opened_paths.workspaces3 {
+                    debug!(
+                        "{} has {} workspace entries",
+                        editor_name,
+                        workspace_paths.len()
+                    );
+                    for workspace_uri in workspace_paths.iter().take(max_count) {
+                        debug!("Processing workspace URI: {}", workspace_uri);
+                        let Some(path) = Self::parse_vscode_uri(workspace_uri) else {
+                            debug!("Failed to parse URI: {}", workspace_uri);
+                            continue;
+                        };
+
+                        if !path.exists() {
+                            debug!("Workspace path doesn't exist: {}", path.display());
+                            continue;
+                        }
+
+                        let name = path
+                            .file_stem()
+                            .and_then(|n| n.to_str())
+                            .unwrap_or("Unknown")
+                            .to_string();
+
+                        debug!("Added workspace: {} at {}", name, path.display());
+                        workspaces.push(RecentWorkspace {
+                            path: path.clone(),
+                            name,
+                            editor: editor_name.to_string(),
+                            command: format!("{} '{}'", command, path.display()),
+                        });
+                    }
+                }
+
+                // Process regular folders (recently opened directories)
+                if let Some(folder_paths) = opened_paths.folders2 {
+                    debug!("{} has {} folder entries", editor_name, folder_paths.len());
+                    for folder_uri in folder_paths.iter().take(max_count) {
+                        debug!("Processing folder URI: {}", folder_uri);
+                        let Some(path) = Self::parse_vscode_uri(folder_uri) else {
+                            debug!("Failed to parse URI: {}", folder_uri);
+                            continue;
+                        };
+
+                        if !path.exists() {
+                            debug!("Folder path doesn't exist: {}", path.display());
+                            continue;
+                        }
+
+                        let name = path
+                            .file_name()
+                            .and_then(|n| n.to_str())
+                            .unwrap_or("Unknown")
+                            .to_string();
+
+                        debug!("Added folder: {} at {}", name, path.display());
+                        workspaces.push(RecentWorkspace {
+                            path: path.clone(),
+                            name,
+                            editor: editor_name.to_string(),
+                            command: format!("{} '{}'", command, path.display()),
+                        });
+                    }
+                }
+            } else {
+                debug!(
+                    "{} storage.json has no recognized workspace format",
+                    editor_name
+                );
+            }
+        } else {
+            debug!("{} storage.json not found", editor_name);
         }
 
         // Also scan workspaceStorage directories
@@ -429,7 +607,8 @@ impl Plugin for EditorsPlugin {
         let mut results = Vec::new();
 
         // Extract search term
-        let search_term = if query.starts_with('@') {
+        let is_command_query = query.starts_with('@');
+        let search_term = if is_command_query {
             query_lower
                 .strip_prefix("@code")
                 .or_else(|| query_lower.strip_prefix("@zed"))
@@ -440,16 +619,22 @@ impl Plugin for EditorsPlugin {
             query_lower.trim()
         };
 
+        // For global search, only show workspaces if query is short (3 chars or less) or if there's a match
+        let show_all_workspaces =
+            is_command_query || search_term.is_empty() || search_term.len() <= 3;
+
         for workspace in &self.recent_workspaces {
-            // Filter by search term
-            if !search_term.is_empty()
-                && !workspace.name.to_lowercase().contains(search_term)
-                && !workspace
+            // Filter by search term - but be more permissive for short queries
+            let matches = search_term.is_empty()
+                || workspace.name.to_lowercase().contains(search_term)
+                || workspace
                     .path
                     .to_string_lossy()
                     .to_lowercase()
-                    .contains(search_term)
-            {
+                    .contains(search_term);
+
+            // Skip non-matching workspaces unless we're showing all
+            if !show_all_workspaces && !matches {
                 continue;
             }
 
@@ -459,13 +644,27 @@ impl Plugin for EditorsPlugin {
                 workspace.path.display()
             ));
 
+            // Score based on match quality
+            let score = if matches && !search_term.is_empty() {
+                if workspace.name.to_lowercase() == search_term {
+                    850 // Exact match
+                } else if workspace.name.to_lowercase().starts_with(search_term) {
+                    820 // Prefix match
+                } else {
+                    800 // Contains match
+                }
+            } else {
+                // No filter active, lower score to not interfere with app results
+                580
+            };
+
             results.push(PluginResult {
                 title: workspace.name.clone(),
                 subtitle,
                 icon: None, // Icon will be resolved from parent_app
                 command: workspace.command.clone(),
                 terminal: false,
-                score: 800, // High score for workspaces
+                score,
                 plugin_name: self.name().to_string(),
                 sub_results: Vec::new(),
                 parent_app: Some(workspace.editor.clone()),
