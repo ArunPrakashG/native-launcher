@@ -390,6 +390,7 @@ A polished launcher with:
   - ✅ Theme documentation with CSS class reference
 
 **Performance Results**:
+
 - Startup time: 0.75ms (133x faster than 100ms target)
 - Search latency: 0.12ms for 500 apps (83x faster than 10ms target)
 - Memory usage: ~20MB (10x better than 30MB target)
@@ -430,7 +431,7 @@ A polished launcher with:
 - Command prefix support (@app, @cal, @code, @files, @shell/$, @ssh, @web)
 - **Exceptional performance**:
   - Startup: **0.75ms** (133x faster than 100ms target)
-  - Search: **0.12ms** for 500 apps (83x faster than 10ms target)  
+  - Search: **0.12ms** for 500 apps (83x faster than 10ms target)
   - Memory: **~20MB** (10x better than 30MB target)
   - Cache: **32KB** (156x under 5MB limit)
 - Themeable interface (5 example themes included)

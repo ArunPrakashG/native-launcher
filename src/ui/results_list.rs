@@ -1,10 +1,11 @@
-use gtk4::prelude::*;
-use gtk4::{Box as GtkBox, Image, Label, ListBox, Orientation, ScrolledWindow};
-use std::cell::RefCell;
-
 use crate::desktop::{DesktopAction, DesktopEntry};
 use crate::plugins::PluginResult;
 use crate::utils::icons::resolve_icon;
+use gtk4::prelude::*;
+use gtk4::{Box as GtkBox, Image, Label, ListBox, Orientation, ScrolledWindow};
+use std::cell::RefCell;
+use std::rc::Rc;
+use tracing::info;
 
 /// Represents an item in the results list
 /// SIMPLIFIED: Each item maps directly to what you see and click
@@ -28,8 +29,8 @@ enum ListItem {
 pub struct ResultsList {
     pub container: ScrolledWindow,
     pub list: ListBox,
-    /// Single flat list: visual order = data order
-    items: RefCell<Vec<ListItem>>,
+    /// Single flat list: visual order = data order (wrapped in Rc so all clones share same data)
+    items: Rc<RefCell<Vec<ListItem>>>,
 }
 
 impl ResultsList {
@@ -47,7 +48,7 @@ impl ResultsList {
         Self {
             container,
             list,
-            items: RefCell::new(Vec::new()),
+            items: Rc::new(RefCell::new(Vec::new())),
         }
     }
 
@@ -87,7 +88,7 @@ impl ResultsList {
 
     /// Render items to the UI (common logic)
     fn render_items(&self, items: Vec<ListItem>) {
-        tracing::debug!("render_items: rendering {} items", items.len());
+        tracing::debug!("Rendering {} items", items.len());
 
         *self.items.borrow_mut() = items.clone();
 
@@ -98,27 +99,37 @@ impl ResultsList {
 
         // Create a row for each item
         for (idx, item) in items.iter().enumerate() {
-            let row = match item {
-                ListItem::App { entry } => {
-                    tracing::debug!("  [{}] App: {}", idx, entry.name);
-                    self.create_result_row(entry)
-                }
-                ListItem::Action { action, .. } => {
-                    tracing::debug!("  [{}] Action: {}", idx, action.name);
-                    self.create_action_row(action)
-                }
-                ListItem::PluginResult { result } => {
-                    tracing::debug!("  [{}] PluginResult: {}", idx, result.title);
-                    self.create_plugin_result_row(result)
-                }
+            let content_box = match item {
+                ListItem::App { entry } => self.create_result_row(entry),
+                ListItem::Action { action, .. } => self.create_action_row(action),
+                ListItem::PluginResult { result } => self.create_plugin_result_row(result),
             };
+
+            // Explicitly create ListBoxRow and set the child
+            let row = gtk4::ListBoxRow::new();
+            row.set_child(Some(&content_box));
+
             self.list.append(&row);
+
+            // Verify GTK assigned the expected index
+            let gtk_index = row.index();
+            if gtk_index != idx as i32 {
+                tracing::warn!(
+                    "GTK index mismatch! Expected {}, got {} for item: {}",
+                    idx,
+                    gtk_index,
+                    match item {
+                        ListItem::App { entry } => &entry.name,
+                        ListItem::Action { action, .. } => &action.name,
+                        ListItem::PluginResult { result } => &result.title,
+                    }
+                );
+            }
         }
 
         // Select first item
         if let Some(first_row) = self.list.row_at_index(0) {
             self.list.select_row(Some(&first_row));
-            tracing::debug!("Selected first row (index 0)");
         }
     }
 
@@ -127,29 +138,24 @@ impl ResultsList {
         let selected_index = self.selected_index()? as usize;
         let items = self.items.borrow();
 
-        tracing::debug!(
-            "get_selected_command: selected_index={}, total_items={}",
-            selected_index,
-            items.len()
-        );
+        // Validate index is within bounds
+        if selected_index >= items.len() {
+            tracing::error!(
+                "Selected index {} is out of bounds (total items: {})",
+                selected_index,
+                items.len()
+            );
+            return None;
+        }
 
         items.get(selected_index).map(|item| {
             let (cmd, term) = match item {
-                ListItem::App { entry } => {
-                    tracing::debug!("Selected App: {}", entry.name);
-                    (entry.exec.clone(), entry.terminal)
-                }
+                ListItem::App { entry } => (entry.exec.clone(), entry.terminal),
                 ListItem::Action {
                     action,
                     parent_entry,
-                } => {
-                    tracing::debug!("Selected Action: {}", action.name);
-                    (action.exec.clone(), parent_entry.terminal)
-                }
-                ListItem::PluginResult { result } => {
-                    tracing::debug!("Selected PluginResult: {}", result.title);
-                    (result.command.clone(), result.terminal)
-                }
+                } => (action.exec.clone(), parent_entry.terminal),
+                ListItem::PluginResult { result } => (result.command.clone(), result.terminal),
             };
             (cmd, term)
         })
@@ -350,10 +356,13 @@ impl ResultsList {
     pub fn select_next(&self) {
         if let Some(current) = self.list.selected_row() {
             let next_index = current.index() + 1;
+
             if let Some(next_row) = self.list.row_at_index(next_index) {
                 self.list.select_row(Some(&next_row));
                 // Auto-scroll to make the selected row visible
                 self.scroll_to_selected();
+
+                info!("Selected next row (index {})", next_index);
             }
         }
     }
@@ -362,11 +371,14 @@ impl ResultsList {
     pub fn select_previous(&self) {
         if let Some(current) = self.list.selected_row() {
             let prev_index = current.index() - 1;
+
             if prev_index >= 0 {
                 if let Some(prev_row) = self.list.row_at_index(prev_index) {
                     self.list.select_row(Some(&prev_row));
                     // Auto-scroll to make the selected row visible
                     self.scroll_to_selected();
+
+                    info!("Selected previous row (index {})", prev_index);
                 }
             }
         }

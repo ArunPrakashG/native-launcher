@@ -1,4 +1,4 @@
-# Native Launcher 🚀
+# Native Launcher 🚀 (Currently WIP)
 
 A modern, fast, and beautifully designed application launcher for Linux, written in Rust. Taking design inspiration from modern launchers like Raycast, built natively for Wayland with GTK4.
 

@@ -304,20 +304,20 @@ fn build_ui(
                 }
                 KeyboardAction::OpenUrl(url) => {
                     info!("Opening URL from plugin: {}", url);
-                    
+
                     // IMPORTANT: Hide window BEFORE opening URL
                     window_clone.close();
-                    
+
                     if let Err(e) = execute_command(&format!("xdg-open '{}'", url), false) {
                         error!("Failed to open URL: {}", e);
                     }
                 }
                 KeyboardAction::Execute { command, terminal } => {
                     info!("Executing command from plugin: {}", command);
-                    
+
                     // IMPORTANT: Hide window BEFORE executing command
                     window_clone.close();
-                    
+
                     if let Err(e) = execute_command(&command, terminal) {
                         error!("Failed to execute command: {}", e);
                     }
@@ -393,20 +393,20 @@ fn build_ui(
                         }
                         KeyboardAction::OpenUrl(url) => {
                             info!("Opening URL from plugin: {}", url);
-                            
+
                             // IMPORTANT: Hide window BEFORE opening URL
                             window_clone.close();
-                            
+
                             if let Err(e) = execute_command(&format!("xdg-open '{}'", url), false) {
                                 error!("Failed to open URL: {}", e);
                             }
                         }
                         KeyboardAction::Execute { command, terminal } => {
                             info!("Executing command from plugin: {}", command);
-                            
+
                             // IMPORTANT: Hide window BEFORE executing command
                             window_clone.close();
-                            
+
                             if let Err(e) = execute_command(&command, terminal) {
                                 error!("Failed to execute command: {}", e);
                             }
