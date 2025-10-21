@@ -403,3 +403,23 @@ listbox row:selected image {
   color: var(--nl-text-secondary);
   letter-spacing: 0.2px;
 }
+
+/* === Plugin Warning === */
+.plugin-warning {
+  background-color: rgba(255, 159, 10, 0.15);
+  border: 1px solid rgba(255, 159, 10, 0.3);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 12px 12px 0 12px;
+}
+
+.plugin-warning-text {
+  font-size: 12px;
+  font-weight: 500;
+  color: #ff9f0a;
+  letter-spacing: 0.2px;
+}
+
+.plugin-warning image {
+  color: #ff9f0a;
+}

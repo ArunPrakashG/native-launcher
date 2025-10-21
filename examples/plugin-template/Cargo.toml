@@ -1,0 +1,12 @@
+[package]
+name = "example-plugin"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "example_plugin"
+crate-type = ["cdylib"] # Important: compile as dynamic library
+
+[dependencies]
+# No dependencies needed for basic plugin
+# Add dependencies as needed for your plugin functionality

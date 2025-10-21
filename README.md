@@ -12,7 +12,7 @@ A modern, fast, and beautifully designed application launcher for Linux, written
 - ⚡ **Lightning Fast**: Sub-100ms startup, <10ms search latency
 - 🎨 **Modern Design**: Clean, minimal UI with coral accents (#FF6363) on charcoal (#1C1C1E)
 - 🔍 **Smart Search**: Intelligent fuzzy matching with relevance scoring
-- 🔌 **Plugin System**: Extensible with keyboard event handling
+- 🔌 **Plugin System**: Extensible with keyboard event handling + dynamic plugin loading
 - 🌐 **Web Search**: Press `Ctrl+Enter` for instant web search
 - 📁 **Workspace Detection**: Find VS Code/VSCodium workspaces automatically
 - ⌨️ **Keyboard-Driven**: Full keyboard navigation and shortcuts
@@ -74,6 +74,18 @@ Unique architecture that moves keyboard handling into plugins:
 - **Example**: Web search plugin handles `Ctrl+Enter` independently
 
 See [Wiki: Architecture](https://github.com/ArunPrakashG/native-launcher/wiki/Architecture#keyboard-event-system) for details.
+
+### Dynamic Plugin System
+
+Load external plugins at runtime without recompiling:
+
+- **Binary plugins**: Compile to `.so` shared libraries
+- **Runtime loading**: Automatically discovered from plugin directories
+- **Safe FFI**: Stable C ABI for plugin compatibility
+- **Performance monitoring**: Built-in metrics and warnings for slow plugins
+- **Example included**: Complete plugin template in `examples/plugin-template/`
+
+See [DYNAMIC_PLUGINS.md](DYNAMIC_PLUGINS.md) for the complete guide on creating your own plugins.
 
 ### Performance First
 

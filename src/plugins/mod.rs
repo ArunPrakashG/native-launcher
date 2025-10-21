@@ -1,5 +1,6 @@
 pub mod applications;
 pub mod calculator;
+pub mod dynamic;
 pub mod editors;
 pub mod files;
 pub mod manager;
@@ -10,6 +11,7 @@ pub mod web_search;
 
 pub use applications::ApplicationsPlugin;
 pub use calculator::CalculatorPlugin;
+pub use dynamic::{load_plugins, DynamicPlugin, PluginMetrics};
 pub use editors::EditorsPlugin;
 pub use files::FileBrowserPlugin;
 pub use manager::PluginManager;

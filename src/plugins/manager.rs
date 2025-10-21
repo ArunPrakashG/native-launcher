@@ -71,6 +71,14 @@ impl PluginManager {
         }
     }
 
+    /// Register a dynamic plugin
+    /// Plugins are automatically sorted by priority after registration
+    pub fn register_plugin(&mut self, plugin: Box<dyn Plugin>) {
+        self.plugins.push(plugin);
+        // Re-sort by priority
+        self.plugins.sort_by(|a, b| b.priority().cmp(&a.priority()));
+    }
+
     /// Search across all plugins
     /// If query starts with @, route to specific plugin(s)
     /// Otherwise, perform global search across all plugins

@@ -65,15 +65,24 @@ fn main() -> Result<()> {
 
     // Create plugin manager with all plugins
     info!("Initializing plugin system...");
-    let plugin_manager = Rc::new(RefCell::new(PluginManager::new(
-        entries.clone(),
-        Some(usage_tracker.clone()),
-        &config,
-    )));
+    let mut plugin_manager =
+        PluginManager::new(entries.clone(), Some(usage_tracker.clone()), &config);
+
+    // Load dynamic plugins
+    info!("Loading dynamic plugins...");
+    let (dynamic_plugins, plugin_metrics) = plugins::load_plugins();
+    for plugin in dynamic_plugins {
+        plugin_manager.register_plugin(plugin);
+    }
+
+    let plugin_manager = Rc::new(RefCell::new(plugin_manager));
     info!(
         "Enabled plugins: {:?}",
         plugin_manager.borrow().enabled_plugins()
     );
+
+    // Store plugin metrics for UI display
+    let plugin_metrics_rc = Rc::new(plugin_metrics);
 
     // Wrap usage tracker for shared access
     let usage_tracker_rc = Rc::new(RefCell::new(usage_tracker));
@@ -85,6 +94,7 @@ fn main() -> Result<()> {
     let plugin_manager_clone = plugin_manager.clone();
     let usage_tracker_clone = usage_tracker_rc.clone();
     let config_clone = config.clone();
+    let metrics_clone = plugin_metrics_rc.clone();
 
     app.connect_activate(move |app| {
         if let Err(e) = build_ui(
@@ -92,6 +102,7 @@ fn main() -> Result<()> {
             plugin_manager_clone.clone(),
             usage_tracker_clone.clone(),
             &config_clone,
+            metrics_clone.clone(),
         ) {
             error!("Failed to build UI: {}", e);
             app.quit();
@@ -110,6 +121,7 @@ fn build_ui(
     plugin_manager: Rc<RefCell<PluginManager>>,
     usage_tracker: Rc<RefCell<UsageTracker>>,
     config: &config::Config,
+    plugin_metrics: Rc<Vec<plugins::PluginMetrics>>,
 ) -> Result<()> {
     info!("Building UI");
 
@@ -139,11 +151,64 @@ fn build_ui(
     // Create keyboard hints
     let keyboard_hints = KeyboardHints::new();
 
+    // Check for slow plugins and show warning if needed
+    let slow_plugins: Vec<_> = plugin_metrics
+        .iter()
+        .filter(|m| m.success && m.is_very_slow())
+        .collect();
+
+    let plugin_warning = if !slow_plugins.is_empty() {
+        let warning_box = GtkBox::builder()
+            .orientation(Orientation::Horizontal)
+            .spacing(8)
+            .css_classes(vec!["plugin-warning"])
+            .build();
+
+        let warning_icon = gtk4::Image::from_icon_name("dialog-warning");
+        warning_icon.set_pixel_size(16);
+
+        let warning_text = gtk4::Label::builder()
+            .label(format!(
+                "⚠️ {} slow plugin{} detected (>50ms load time)",
+                slow_plugins.len(),
+                if slow_plugins.len() > 1 { "s" } else { "" }
+            ))
+            .css_classes(vec!["plugin-warning-text"])
+            .halign(gtk4::Align::Start)
+            .build();
+
+        warning_box.append(&warning_icon);
+        warning_box.append(&warning_text);
+
+        // Log plugin details
+        for metric in &slow_plugins {
+            info!(
+                "Slow plugin: {} - {:?}, {}",
+                metric
+                    .path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy(),
+                metric.load_time,
+                metric.memory_size_string()
+            );
+        }
+
+        Some(warning_box)
+    } else {
+        None
+    };
+
     // Create main container
     let main_box = GtkBox::builder()
         .orientation(Orientation::Vertical)
         .spacing(10)
         .build();
+
+    // Add plugin warning at the top if there are slow plugins
+    if let Some(warning) = plugin_warning {
+        main_box.append(&warning);
+    }
 
     main_box.append(&search_widget.container);
     main_box.append(&results_list.container);
