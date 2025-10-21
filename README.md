@@ -37,19 +37,6 @@ A modern, fast, and beautifully designed application launcher for Linux, written
 - 🎨 **Themeable**: Custom CSS styling support
 - 🏃 **Background Loading**: Icon cache preloads in background for instant display
 
-## 🎨 Design Language
-
-Native Launcher follows **Raycast's design principles**:
-
-- **Minimal & Clean**: Flat design with subtle depth
-- **Professional Dark Theme**: Charcoal backgrounds (#1C1C1E)
-- **Coral/Red Accents**: Distinctive selection color (#FF6363)
-- **Fast Animations**: Quick 0.15s transitions
-- **Clear Typography**: High contrast white text on dark
-- **Subtle Borders**: Minimal separation, maximum clarity
-
-See [RAYCAST_DESIGN.md](RAYCAST_DESIGN.md) for detailed design documentation.
-
 ## 🎯 What Makes Native Launcher Special?
 
 ### Inline Desktop Actions
@@ -320,7 +307,6 @@ For more issues, see [TESTING.md](TESTING.md) or open an issue.
 
 - **[RUNNING.md](RUNNING.md)** - Building, running, and testing the launcher
 - **[HOTKEY_SETUP.md](HOTKEY_SETUP.md)** - Setting up global keyboard shortcuts
-- **[RAYCAST_DESIGN.md](RAYCAST_DESIGN.md)** - Design language and visual style
 - **[TESTING.md](TESTING.md)** - Comprehensive testing guide
 - **[CHANGES.md](CHANGES.md)** - Recent changes and fixes
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** - How to contribute

@@ -9,17 +9,17 @@ mod utils;
 use anyhow::Result;
 use config::ConfigLoader;
 use desktop::DesktopScanner;
-use gtk4::gdk::{Display, Key};
+use gtk4::gdk::Key;
 use gtk4::prelude::*;
-use gtk4::{Application, Box as GtkBox, CssProvider, Orientation};
+use gtk4::{Application, Box as GtkBox, Orientation};
 use plugins::PluginManager;
 use std::cell::RefCell;
 use std::rc::Rc;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 use tracing_subscriber::EnvFilter;
-use ui::{KeyboardHints, LauncherWindow, ResultsList, SearchWidget};
+use ui::{load_theme, KeyboardHints, LauncherWindow, ResultsList, SearchWidget};
 use usage::UsageTracker;
-use utils::execute_command;
+use utils::{detect_web_search, execute_command, get_default_browser};
 
 const APP_ID: &str = "com.github.native-launcher";
 
@@ -105,37 +105,6 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-/// Detect if query is a web search and extract engine + search term + URL
-/// Uses WebSearchPlugin to handle all web search logic
-fn detect_web_search(query: &str) -> Option<(String, String, String)> {
-    let web_search = plugins::WebSearchPlugin::new();
-    web_search.build_search_url(query)
-}
-
-/// Get default browser name for display
-fn get_default_browser() -> String {
-    // Try to get default browser from xdg-settings
-    if let Ok(output) = std::process::Command::new("xdg-settings")
-        .args(["get", "default-web-browser"])
-        .output()
-    {
-        if output.status.success() {
-            if let Ok(browser_desktop) = String::from_utf8(output.stdout) {
-                // Extract browser name from .desktop file (e.g., "firefox.desktop" -> "Firefox")
-                let name = browser_desktop
-                    .trim()
-                    .trim_end_matches(".desktop")
-                    .split('-')
-                    .next()
-                    .unwrap_or("Browser");
-                return name[0..1].to_uppercase() + &name[1..];
-            }
-        }
-    }
-
-    "Browser".to_string()
-}
-
 fn build_ui(
     app: &Application,
     plugin_manager: Rc<RefCell<PluginManager>>,
@@ -144,8 +113,8 @@ fn build_ui(
 ) -> Result<()> {
     info!("Building UI");
 
-    // Load CSS
-    load_css();
+    // Load CSS theme
+    load_theme();
 
     // Create main window with config
     let launcher_window = LauncherWindow::new(app);
@@ -355,54 +324,4 @@ fn build_ui(
 
     info!("UI built successfully");
     Ok(())
-}
-
-fn load_css() {
-    let provider = CssProvider::new();
-
-    // Try to load user theme first
-    let custom_theme_path =
-        dirs::config_dir().map(|config| config.join("native-launcher").join("theme.css"));
-
-    let css_loaded = if let Some(theme_path) = custom_theme_path {
-        if theme_path.exists() {
-            info!("Loading custom theme from: {}", theme_path.display());
-            match std::fs::read_to_string(&theme_path) {
-                Ok(css_content) => {
-                    provider.load_from_data(&css_content);
-                    true
-                }
-                Err(e) => {
-                    warn!(
-                        "Failed to read custom theme: {}, falling back to default",
-                        e
-                    );
-                    false
-                }
-            }
-        } else {
-            debug!("No custom theme found at: {}", theme_path.display());
-            false
-        }
-    } else {
-        false
-    };
-
-    // Fall back to built-in CSS if custom theme not loaded
-    if !css_loaded {
-        info!("Loading built-in theme");
-        let css = include_str!("ui/style.css");
-        provider.load_from_data(css);
-    }
-
-    if let Some(display) = Display::default() {
-        gtk4::style_context_add_provider_for_display(
-            &display,
-            &provider,
-            gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
-        );
-        info!("CSS loaded successfully");
-    } else {
-        error!("Failed to get default display for CSS loading");
-    }
 }

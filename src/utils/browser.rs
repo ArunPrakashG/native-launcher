@@ -73,12 +73,14 @@ mod tests {
 
     #[test]
     fn test_detect_web_search_google() {
-        let result = detect_web_search("g rust programming");
+        // Test explicit "google" keyword (not "g")
+        let result = detect_web_search("google rust programming");
         assert!(result.is_some());
         let (engine, term, url) = result.unwrap();
         assert_eq!(engine, "google");
-        assert_eq!(term, "rust programming");
+        assert_eq!(term, "rust programming"); // Parsed: "google" prefix stripped
         assert!(url.contains("google.com"));
+        assert!(url.contains("rust")); // Check query is encoded in URL
     }
 
     #[test]
