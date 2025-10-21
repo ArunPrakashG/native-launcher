@@ -13,6 +13,7 @@ A modern, fast, and beautifully designed application launcher for Linux, written
 - 🎨 **Modern Design**: Clean, minimal UI with coral accents (#FF6363) on charcoal (#1C1C1E)
 - 🔍 **Smart Search**: Intelligent fuzzy matching with relevance scoring
 - 🔌 **Plugin System**: Extensible with keyboard event handling + dynamic plugin loading
+- 🧮 **Advanced Calculator**: Time calculations, unit conversions, currency, timezone - with clipboard copy
 - 🌐 **Web Search**: Press `Ctrl+Enter` for instant web search
 - 📁 **Workspace Detection**: Find VS Code/VSCodium workspaces automatically
 - ⌨️ **Keyboard-Driven**: Full keyboard navigation and shortcuts
@@ -21,6 +22,18 @@ A modern, fast, and beautifully designed application launcher for Linux, written
 ## Quick Start
 
 ### Installation
+
+**Runtime Dependencies:**
+
+- `wl-clipboard` - For clipboard support (advanced calculator, etc.)
+  ```bash
+  # Ubuntu/Debian
+  sudo apt install wl-clipboard
+  # Arch
+  sudo pacman -S wl-clipboard
+  # Fedora
+  sudo dnf install wl-clipboard
+  ```
 
 **Build from source:**
 
@@ -70,6 +83,7 @@ To reset to defaults, simply delete `~/.config/native-launcher/` and the cache f
 
 - `@app <query>` - Search applications only
 - `@cal <expression>` - Calculate mathematical expressions
+- `@convert`, `@time`, `@currency` - Advanced calculations (time, units, currency, timezone)
 - `@code`, `@zed`, `@editor` - Search editor workspaces
 - `@files` - Search recent files and directories
 - `@shell <cmd>` or `$ <cmd>` - Execute shell commands
@@ -132,6 +146,42 @@ Every feature prioritizes speed:
 
 See [Wiki: Performance](https://github.com/ArunPrakashG/native-launcher/wiki/Performance) for benchmarks.
 
+### Advanced Calculator with Clipboard
+
+Natural language calculations beyond basic math:
+
+**Time Calculations:**
+
+- `1 hour ago` → Past time in local, UTC, and unix timestamp
+- `in 5 hours` → Future time calculation
+- `350 days ago` → Historical dates
+- Press `Enter` to copy to clipboard with desktop notification
+
+**Unit Conversions:**
+
+- `150 days to years` → Time unit conversion
+- `5 km to miles` → Distance conversion
+- `100 pounds to kg` → Weight conversion
+- `32 fahrenheit to celsius` → Temperature conversion
+
+**Currency Exchange:**
+
+- `100 USD to EUR` → Currency conversion (10+ currencies supported)
+- `50 GBP to JPY` → Multi-currency support
+
+**Timezone Info:**
+
+- `now in UTC` → Current time in multiple timezones
+
+**Features:**
+
+- 📋 One-press clipboard copy (Enter key)
+- 🔔 Desktop notifications confirm copy
+- 🚀 Instant results as you type
+- 💡 Smart natural language parsing
+
+See [docs/ADVANCED_CALCULATOR.md](docs/ADVANCED_CALCULATOR.md) for complete guide and examples.
+
 ## Development
 
 ```bash
@@ -150,8 +200,6 @@ cargo fmt
 # Lint
 cargo clippy
 ```
-
-See [Wiki: Contributing](https://github.com/ArunPrakashG/native-launcher/wiki/Contributing) for development setup.
 
 See [Wiki: Contributing](https://github.com/ArunPrakashG/native-launcher/wiki/Contributing) for development setup.
 

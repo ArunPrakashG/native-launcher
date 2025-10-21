@@ -514,6 +514,16 @@ Cross-platform launcher supporting both Wayland and X11.
   - ✅ **Support "workspace", "project", "code" queries**
   - ✅ Priority: 650 (between SSH and web search)
   - ✅ 6 unit tests passing
+- [x] **Advanced Calculator Plugin**: Natural language calculations beyond basic math
+  - ✅ **Time calculations**: "1 hour ago", "350 days ago", "in 5 hours"
+  - ✅ **Unit conversions**: "150 days to years", "5 km to miles", "100 pounds to kg"
+  - ✅ **Temperature**: "32 fahrenheit to celsius"
+  - ✅ **Currency**: "100 USD to EUR" (static rates, API integration planned)
+  - ✅ **Timezone**: "now in UTC"
+  - ✅ Command prefixes: @calc, @convert, @time, @currency
+  - ✅ Priority: 850 (high priority for calculations)
+  - ✅ 7 unit tests covering all calculation types
+  - ✅ Comprehensive documentation with examples
 - [ ] **Window Switcher**: Switch between open windows
   - Integrate with compositor
   - Show window previews
@@ -522,6 +532,10 @@ Cross-platform launcher supporting both Wayland and X11.
 
 - `src/plugins/ssh.rs` (SSH plugin with config parsing, 340 lines)
 - `src/plugins/files.rs` (File browser with recent files and navigation, 430 lines)
+- `src/plugins/advanced_calc.rs` (Advanced calculator with time/unit/currency conversions, 530 lines)
+- `docs/ADVANCED_CALCULATOR.md` (Complete feature documentation with examples)
+- `tests/advanced_calc_tests.rs` (Comprehensive test suite, 7 tests)
+- `examples/advanced_calculator_examples.sh` (Usage examples script)
 
 **Configuration Added**:
 

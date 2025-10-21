@@ -1,7 +1,7 @@
 use super::traits::{Plugin, PluginContext, PluginResult};
 use super::{
-    ApplicationsPlugin, CalculatorPlugin, EditorsPlugin, FileBrowserPlugin, ShellPlugin, SshPlugin,
-    WebSearchPlugin,
+    AdvancedCalculatorPlugin, ApplicationsPlugin, CalculatorPlugin, EditorsPlugin,
+    FileBrowserPlugin, ShellPlugin, SshPlugin, WebSearchPlugin,
 };
 use crate::config::Config;
 use crate::desktop::DesktopEntry;
@@ -31,9 +31,15 @@ impl PluginManager {
         };
         plugins.push(Box::new(apps_plugin));
 
-        // Calculator plugin
+        // Calculator plugin (basic math)
         if config.plugins.calculator {
             plugins.push(Box::new(CalculatorPlugin::new()));
+        }
+
+        // Advanced calculator plugin (time, units, currency, timezone)
+        // Always enabled alongside basic calculator
+        if config.plugins.calculator {
+            plugins.push(Box::new(AdvancedCalculatorPlugin::new()));
         }
 
         // Shell plugin

@@ -1,3 +1,4 @@
+pub mod advanced_calc;
 pub mod applications;
 pub mod calculator;
 pub mod dynamic;
@@ -9,6 +10,7 @@ pub mod ssh;
 pub mod traits;
 pub mod web_search;
 
+pub use advanced_calc::AdvancedCalculatorPlugin;
 pub use applications::ApplicationsPlugin;
 pub use calculator::CalculatorPlugin;
 pub use dynamic::{load_plugins, DynamicPlugin, PluginMetrics};
