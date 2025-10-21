@@ -5,217 +5,91 @@ A modern, fast, and beautifully designed application launcher for Linux, written
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Rust](https://img.shields.io/badge/rust-1.75%2B-orange.svg)
 
-## ✨ Features
+> **📚 Full Documentation**: Visit the **[Wiki](https://github.com/ArunPrakashG/native-launcher/wiki)** for comprehensive guides
 
-### Core Functionality
+## ✨ Features
 
 - ⚡ **Lightning Fast**: Sub-100ms startup, <10ms search latency
 - 🎨 **Modern Design**: Clean, minimal UI with coral accents (#FF6363) on charcoal (#1C1C1E)
-- 🌊 **Fluid Interactions**: Fast 0.15s transitions, 60fps rendering
 - 🔍 **Smart Search**: Intelligent fuzzy matching with relevance scoring
-- 📊 **Usage Learning**: Tracks frequently used apps for better results
+- 🔌 **Plugin System**: Extensible with keyboard event handling
+- 🌐 **Web Search**: Press `Ctrl+Enter` for instant web search
+- 📁 **Workspace Detection**: Find VS Code/VSCodium workspaces automatically
+- ⌨️ **Keyboard-Driven**: Full keyboard navigation and shortcuts
+- 🪟 **Wayland Native**: Built on gtk4-layer-shell for seamless integration
 
-### Desktop Integration
+## Quick Start
 
-- 🎯 **Wayland Native**: Built on gtk4-layer-shell for seamless integration
-- 🖥️ **Multi-Monitor**: Smart positioning across displays
-- 🔌 **Desktop Actions**: Right-click menus inline (e.g., Firefox → New Private Window)
-- 🎨 **Icon Support**: Automatic icon resolution from system themes
+### Installation
 
-### Plugin System
+**Build from source:**
 
-- 📁 **Workspace Detection**: Find VS Code/VSCodium workspaces (searches `.vscode`, `.code-workspace` files)
-- 📂 **Recent Files**: Access recently opened files from all editors
-- 🔧 **Calculator**: Instant math evaluation (`2+2`, `sqrt(16)`)
-- 🌐 **Web Search**: Quick search shortcuts (@google, @github, @stackoverflow)
-- 🐚 **Shell Commands**: Execute terminal commands directly
-- 🔌 **Extensible**: Plugin API for custom functionality
+```bash
+git clone https://github.com/ArunPrakashG/native-launcher.git
+cd native-launcher
+cargo build --release
+sudo install -Dm755 target/release/native-launcher /usr/local/bin/
+```
 
-### User Experience
+**Full installation guide**: See [Wiki: Installation](https://github.com/ArunPrakashG/native-launcher/wiki/Installation)
 
-- ⌨️ **Keyboard-Driven**: Full keyboard navigation (↑/↓ arrows, Enter, Escape)
-- 🎨 **Themeable**: Custom CSS styling support
-- 🏃 **Background Loading**: Icon cache preloads in background for instant display
+### Basic Usage
 
-## 🎯 What Makes Native Launcher Special?
+1. **Configure hotkey** in your compositor (e.g., `Super+Space`)
+2. **Launch**: Press your configured hotkey
+3. **Search**: Type to search applications
+4. **Navigate**: Use `↑/↓` arrow keys
+5. **Launch**: Press `Enter`
+6. **Web Search**: Press `Ctrl+Enter` to search the web
 
-### Inline Desktop Actions
+**Full usage guide**: See [Wiki: Quick Start](https://github.com/ArunPrakashG/native-launcher/wiki/Quick-Start)
 
-Unlike traditional launchers, Native Launcher displays application actions inline:
+## Documentation
 
-- **No mode switching**: Actions appear directly under parent apps
-- **Visual clarity**: Indented with coral highlights for easy identification
-- **Fast workflow**: No need to navigate into submenus
+📚 **[Visit the Wiki](https://github.com/ArunPrakashG/native-launcher/wiki)** for complete documentation:
 
-### Intelligent Workspace Detection
+### User Guides
 
-Automatically finds and displays workspaces from code editors:
+- **[Installation](https://github.com/ArunPrakashG/native-launcher/wiki/Installation)** - Build and install
+- **[Keyboard Shortcuts](https://github.com/ArunPrakashG/native-launcher/wiki/Keyboard-Shortcuts)** - Complete shortcut reference
+- **[Configuration](https://github.com/ArunPrakashG/native-launcher/wiki/Configuration)** - Customize behavior
+- **[Compositor Integration](https://github.com/ArunPrakashG/native-launcher/wiki/Compositor-Integration)** - Set up hotkeys
 
-- **VS Code/VSCodium**: Searches `~/.config/Code/storage.json` and `.code-workspace` files
-- **Recent projects**: Shows recently opened workspaces first
-- **Parent app icons**: Workspace entries show greyed VS Code icon for context
+### Developer Guides
 
-### Performance First Philosophy
+- **[Plugin Development](https://github.com/ArunPrakashG/native-launcher/wiki/Plugin-Development)** - Create custom plugins
+- **[Architecture](https://github.com/ArunPrakashG/native-launcher/wiki/Architecture)** - Technical design
+- **[API Reference](https://github.com/ArunPrakashG/native-launcher/wiki/API-Reference)** - Plugin trait documentation
+- **[Contributing](https://github.com/ArunPrakashG/native-launcher/wiki/Contributing)** - How to contribute
+
+## Highlights
+
+### Plugin-Driven Keyboard Events
+
+Unique architecture that moves keyboard handling into plugins:
+
+- **No hardcoded shortcuts**: Plugins handle their own key combinations
+- **Priority-based dispatch**: High-priority plugins get events first
+- **Extensible**: Add custom shortcuts without touching core code
+- **Example**: Web search plugin handles `Ctrl+Enter` independently
+
+See [Wiki: Architecture](https://github.com/ArunPrakashG/native-launcher/wiki/Architecture#keyboard-event-system) for details.
+
+### Performance First
 
 Every feature prioritizes speed:
 
 - **<100ms cold start**: Optimized startup sequence
 - **<10ms search**: Fast fuzzy matching with caching
+- **<30MB memory**: Minimal resource footprint
 - **Background loading**: Icon cache preloads without blocking UI
-- **No heavy animations**: Smooth 60fps transitions
 
-## Screenshots
-
-_Coming soon..._
-
-## Installation
-
-### Prerequisites
-
-#### Build Dependencies
-
-```bash
-# Arch Linux
-sudo pacman -S rust gtk4 gtk4-layer-shell pkg-config
-
-# Ubuntu/Debian
-sudo apt install cargo libgtk-4-dev libgtk4-layer-shell-dev pkg-config
-
-# Fedora
-sudo dnf install rust cargo gtk4-devel gtk4-layer-shell-devel pkg-config
-```
-
-#### Runtime Requirements
-
-- GTK4
-- gtk4-layer-shell
-- A Wayland compositor with layer shell support (Sway, Hyprland, KDE Plasma, GNOME)
-
-### From Source
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/native-launcher
-cd native-launcher
-
-# Build in release mode
-cargo build --release
-
-# Install to system (optional)
-sudo cp target/release/native-launcher /usr/local/bin/
-```
-
-See [RUNNING.md](RUNNING.md) for detailed build and execution instructions.
-
-### Package Managers
-
-_Coming soon: AUR, .deb, .rpm packages_
-
-## Usage
-
-### Basic Usage
-
-1. **Start the launcher:**
-
-   ```bash
-   native-launcher
-   ```
-
-2. **Keyboard Shortcut:** Configure in your compositor to open on `Super+Space`
-
-   See [HOTKEY_SETUP.md](HOTKEY_SETUP.md) for detailed setup instructions for all compositors.
-
-3. **Search & Launch:**
-
-   - Type to search applications
-   - Use ↑/↓ arrow keys to navigate
-   - Press Enter to launch
-   - Press Escape to close
-
-4. **Advanced Features:**
-   - **Desktop Actions**: Actions appear inline under parent apps (e.g., Firefox shows "New Window", "Private Window")
-   - **Workspace Search**: Type "code" to see VS Code workspaces from your projects
-   - **Command Search**: Use `@` prefixes for specialized searches:
-     - `@ws` or `@workspace` - Search only workspaces
-     - `@recent` or `@file` - Search recent files
-     - `@calc 2+2` - Calculator
-     - `@google query` - Web search
-     - `@shell ls -la` - Execute shell commands
-
-### Configuration
-
-Configuration file location: `~/.config/native-launcher/config.toml`
-
-Generate default configuration:
-
-```bash
-native-launcher --generate-config
-```
-
-Example configuration:
-
-```toml
-[appearance]
-width = 800
-max_results = 10
-show_icons = true
-icon_size = 48
-
-[behavior]
-fuzzy_search = true
-remember_usage = true
-
-[keyboard]
-activation_key = "Super_L+space"
-```
-
-See [docs/configuration.md](docs/configuration.md) for full configuration reference.
-
-### Compositor Integration
-
-#### Sway
-
-Add to `~/.config/sway/config`:
-
-```
-bindsym $mod+Space exec native-launcher
-```
-
-#### Hyprland
-
-Add to `~/.config/hypr/hyprland.conf`:
-
-```
-bind = SUPER, SPACE, exec, native-launcher
-```
-
-#### Other Compositors
-
-Consult your compositor's documentation for setting custom keybindings.
+See [Wiki: Performance](https://github.com/ArunPrakashG/native-launcher/wiki/Performance) for benchmarks.
 
 ## Development
 
-### Project Structure
-
-```
-native-launcher/
-├── src/
-│   ├── main.rs           # Entry point
-│   ├── config/           # Configuration management
-│   ├── desktop/          # Desktop file parsing
-│   ├── search/           # Search engine
-│   ├── ui/               # GTK4 user interface
-│   ├── keyboard/         # Input handling
-│   ├── cache/            # Caching system
-│   └── utils/            # Utilities
-├── plans.md              # Detailed development roadmap
-└── docs/                 # Documentation
-```
-
-### Building for Development
-
 ```bash
-# Build and run in debug mode
+# Run in debug mode
 cargo run
 
 # Run with logging
@@ -224,9 +98,6 @@ RUST_LOG=debug cargo run
 # Run tests
 cargo test
 
-# Run benchmarks
-cargo bench
-
 # Format code
 cargo fmt
 
@@ -234,100 +105,33 @@ cargo fmt
 cargo clippy
 ```
 
-### Development Roadmap
+See [Wiki: Contributing](https://github.com/ArunPrakashG/native-launcher/wiki/Contributing) for development setup.
 
-See [plans.md](plans.md) for the complete phase-by-phase development plan including:
-
-- **Phase 1 (MVP)**: Core functionality - desktop file parsing, basic search, GTK4 UI
-- **Phase 2**: Enhanced search with fuzzy matching, icons, usage tracking
-- **Phase 3**: Advanced features - plugins, theming, performance optimization
-- **Phase 4**: X11 support (optional)
-- **Phase 5**: Extended plugin ecosystem
+See [Wiki: Contributing](https://github.com/ArunPrakashG/native-launcher/wiki/Contributing) for development setup.
 
 ## Similar Projects
 
-Native Launcher is inspired by these excellent projects:
-
 - [Rofi](https://github.com/davatorium/rofi) - The classic window switcher and launcher
 - [Wofi](https://hg.sr.ht/~scoopta/wofi) - Wayland-native GTK launcher
-- [Hyprshell](https://github.com/H3rmt/hyprshell) - Modern Rust-based launcher for Hyprland
 - [Walker](https://github.com/abenz1267/walker) - Another great Wayland launcher
 - [Ulauncher](https://ulauncher.io/) - Feature-rich Python launcher
 
 ## Contributing
 
-Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting PRs.
-
-### Ways to Contribute
-
-- 🐛 Report bugs and issues
-- 💡 Suggest new features
-- 📝 Improve documentation
-- 🔧 Submit bug fixes
-- ✨ Develop new plugins
-- 🌍 Add translations
-
-## Performance
-
-Target benchmarks:
-
-- **Startup**: <100ms (cold start)
-- **Search**: <10ms (500+ applications)
-- **Memory**: <30MB (idle)
-
-Current performance: _TBD (under development)_
-
-## Troubleshooting
-
-### Issue: Launcher doesn't show up
-
-**Solution**: Ensure your compositor supports the layer shell protocol:
-
-```bash
-# Check if wlr-layer-shell is available
-wayland-info | grep layer_shell
-```
-
-### Issue: Keyboard shortcut not working
-
-**Solution**: Configure the shortcut in your compositor's config file, not in native-launcher.
-
-### Issue: No applications showing
-
-**Solution**: Verify desktop files exist:
-
-```bash
-ls /usr/share/applications/
-ls ~/.local/share/applications/
-```
-
-For more issues, see [TESTING.md](TESTING.md) or open an issue.
-
-## Documentation
-
-- **[RUNNING.md](RUNNING.md)** - Building, running, and testing the launcher
-- **[HOTKEY_SETUP.md](HOTKEY_SETUP.md)** - Setting up global keyboard shortcuts
-- **[TESTING.md](TESTING.md)** - Comprehensive testing guide
-- **[CHANGES.md](CHANGES.md)** - Recent changes and fixes
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** - How to contribute
-- **[plans.md](plans.md)** - Development roadmap
+Contributions are welcome! See [Wiki: Contributing](https://github.com/ArunPrakashG/native-launcher/wiki/Contributing) for guidelines.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
 - Thanks to the Rust and GTK communities
-- Inspired by the excellent work on Rofi, Wofi, and Hyprshell
-- Design inspired by [Raycast](https://www.raycast.com/)
+- Inspired by [Raycast](https://www.raycast.com/), Rofi, and Wofi
 - Built on the freedesktop.org specifications
-
-## Contact
-
-- **Issues**: [GitHub Issues](https://github.com/yourusername/native-launcher/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/native-launcher/discussions)
 
 ---
 
-**Star ⭐ this repo if you find it useful!**
+**⭐ Star this repo if you find it useful!**
+
+**📚 [Visit the Wiki](https://github.com/ArunPrakashG/native-launcher/wiki) for complete documentation**

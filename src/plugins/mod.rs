@@ -15,5 +15,5 @@ pub use files::FileBrowserPlugin;
 pub use manager::PluginManager;
 pub use shell::ShellPlugin;
 pub use ssh::SshPlugin;
-pub use traits::PluginResult;
+pub use traits::{KeyboardAction, KeyboardEvent, PluginResult};
 pub use web_search::WebSearchPlugin;

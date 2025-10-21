@@ -1,5 +1,64 @@
 use anyhow::Result;
+use gtk4::gdk::{Key, ModifierType};
 use std::fmt::Debug;
+
+/// Keyboard event passed to plugins
+#[derive(Debug, Clone)]
+pub struct KeyboardEvent {
+    /// The key that was pressed
+    pub key: Key,
+    /// Active modifiers (Ctrl, Shift, Alt, etc.)
+    pub modifiers: ModifierType,
+    /// Current search query text
+    pub query: String,
+    /// Whether there's a selected result
+    pub has_selection: bool,
+}
+
+impl KeyboardEvent {
+    pub fn new(key: Key, modifiers: ModifierType, query: String, has_selection: bool) -> Self {
+        Self {
+            key,
+            modifiers,
+            query,
+            has_selection,
+        }
+    }
+
+    /// Check if Ctrl modifier is pressed
+    pub fn has_ctrl(&self) -> bool {
+        self.modifiers.contains(ModifierType::CONTROL_MASK)
+    }
+
+    /// Check if Shift modifier is pressed
+    pub fn has_shift(&self) -> bool {
+        self.modifiers.contains(ModifierType::SHIFT_MASK)
+    }
+
+    /// Check if Alt modifier is pressed
+    pub fn has_alt(&self) -> bool {
+        self.modifiers.contains(ModifierType::ALT_MASK)
+    }
+
+    /// Check if Super/Meta modifier is pressed
+    pub fn has_super(&self) -> bool {
+        self.modifiers.contains(ModifierType::SUPER_MASK)
+            || self.modifiers.contains(ModifierType::META_MASK)
+    }
+}
+
+/// Action that a plugin can take in response to a keyboard event
+#[derive(Debug, Clone)]
+pub enum KeyboardAction {
+    /// Plugin didn't handle this event, pass to next plugin
+    None,
+    /// Execute command and close window
+    Execute { command: String, terminal: bool },
+    /// Open URL in default browser and close window
+    OpenUrl(String),
+    /// Event was handled but don't close window
+    Handled,
+}
 
 /// Represents a result from a plugin search
 #[derive(Debug, Clone)]
@@ -37,7 +96,6 @@ impl PluginResult {
             score: 0,
             plugin_name,
             #[allow(dead_code)]
-
             sub_results: Vec::new(),
             parent_app: None,
         }
@@ -107,7 +165,6 @@ impl PluginContext {
         Self {
             max_results,
             #[allow(dead_code)]
-
             include_low_scores: false,
         }
     }
@@ -145,5 +202,13 @@ pub trait Plugin: Debug + Send + Sync {
     /// Whether this plugin is enabled
     fn enabled(&self) -> bool {
         true
+    }
+
+    /// Handle keyboard events
+    /// Return KeyboardAction::None if this plugin doesn't handle the event
+    /// Events are dispatched to plugins in priority order (highest first)
+    /// First plugin to return non-None action wins
+    fn handle_keyboard_event(&self, _event: &KeyboardEvent) -> KeyboardAction {
+        KeyboardAction::None
     }
 }

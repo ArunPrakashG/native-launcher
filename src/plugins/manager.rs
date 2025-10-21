@@ -241,6 +241,28 @@ impl PluginManager {
         Ok(final_results)
     }
 
+    /// Dispatch keyboard event to plugins in priority order
+    /// Returns the action from the first plugin that handles the event
+    pub fn dispatch_keyboard_event(
+        &self,
+        event: &super::traits::KeyboardEvent,
+    ) -> super::traits::KeyboardAction {
+        // Dispatch to plugins in priority order (already sorted)
+        for plugin in &self.plugins {
+            if !plugin.enabled() {
+                continue;
+            }
+
+            let action = plugin.handle_keyboard_event(event);
+            match action {
+                super::traits::KeyboardAction::None => continue, // Try next plugin
+                _ => return action,                              // First handler wins
+            }
+        }
+
+        super::traits::KeyboardAction::None
+    }
+
     /// Get list of enabled plugins
     pub fn enabled_plugins(&self) -> Vec<&str> {
         self.plugins

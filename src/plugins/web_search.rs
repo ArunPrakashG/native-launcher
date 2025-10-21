@@ -1,5 +1,6 @@
-use super::traits::{Plugin, PluginContext, PluginResult};
+use super::traits::{KeyboardAction, KeyboardEvent, Plugin, PluginContext, PluginResult};
 use anyhow::Result;
+use gtk4::gdk::Key;
 use std::collections::HashMap;
 
 /// Plugin for quick web searches
@@ -162,6 +163,18 @@ impl Plugin for WebSearchPlugin {
     fn enabled(&self) -> bool {
         self.enabled
     }
+
+    fn handle_keyboard_event(&self, event: &KeyboardEvent) -> KeyboardAction {
+        // Handle Ctrl+Enter for web search
+        if event.key == Key::Return && event.has_ctrl() {
+            // Build web search URL from current query
+            if let Some((_engine, _search_term, url)) = self.build_search_url(&event.query) {
+                return KeyboardAction::OpenUrl(url);
+            }
+        }
+
+        KeyboardAction::None
+    }
 }
 
 #[cfg(test)]
@@ -199,5 +212,51 @@ mod tests {
         let results = web.search("google rust", &ctx).unwrap();
         assert_eq!(results.len(), 1);
         assert!(results[0].title.contains("rust"));
+    }
+
+    #[test]
+    fn test_keyboard_event_ctrl_enter() {
+        use super::super::traits::{KeyboardAction, KeyboardEvent, Plugin};
+        use gtk4::gdk::{Key, ModifierType};
+
+        let web = WebSearchPlugin::new();
+
+        // Test Ctrl+Enter with a query
+        let event = KeyboardEvent::new(
+            Key::Return,
+            ModifierType::CONTROL_MASK,
+            "google rust programming".to_string(),
+            false,
+        );
+
+        match web.handle_keyboard_event(&event) {
+            KeyboardAction::OpenUrl(url) => {
+                assert!(url.contains("google.com"));
+                assert!(url.contains("rust"));
+            }
+            _ => panic!("Expected OpenUrl action"),
+        }
+    }
+
+    #[test]
+    fn test_keyboard_event_regular_enter() {
+        use super::super::traits::{KeyboardAction, KeyboardEvent, Plugin};
+        use gtk4::gdk::{Key, ModifierType};
+
+        let web = WebSearchPlugin::new();
+
+        // Test regular Enter (no Ctrl)
+        let event = KeyboardEvent::new(
+            Key::Return,
+            ModifierType::empty(),
+            "firefox".to_string(),
+            true,
+        );
+
+        // Should return None, let other handlers deal with it
+        match web.handle_keyboard_event(&event) {
+            KeyboardAction::None => (),
+            _ => panic!("Expected None action"),
+        }
     }
 }

@@ -12,7 +12,7 @@ use desktop::DesktopScanner;
 use gtk4::gdk::Key;
 use gtk4::prelude::*;
 use gtk4::{Application, Box as GtkBox, Orientation};
-use plugins::PluginManager;
+use plugins::{KeyboardAction, KeyboardEvent, PluginManager};
 use std::cell::RefCell;
 use std::rc::Rc;
 use tracing::{debug, error, info};
@@ -194,53 +194,64 @@ fn build_ui(
         let window_clone = launcher_window.window.clone();
         let usage_tracker_clone = usage_tracker.clone();
         let search_entry_clone = search_widget.entry.clone();
-        let search_footer_clone = search_footer.clone();
+        let plugin_manager_clone = plugin_manager.clone();
 
         search_widget.entry.connect_activate(move |entry| {
-            // Get current event to check modifiers
+            // Get current modifiers
             let display = entry.display();
             let seat = display.default_seat();
+            let modifiers = seat
+                .and_then(|s| s.keyboard())
+                .map(|k| k.modifier_state())
+                .unwrap_or(gtk4::gdk::ModifierType::empty());
 
-            if let Some(seat) = seat {
-                if let Some(keyboard) = seat.keyboard() {
-                    let modifiers = keyboard.modifier_state();
+            // Create keyboard event and dispatch to plugins
+            let query = search_entry_clone.text().to_string();
+            let has_selection = results_list.get_selected_command().is_some();
 
-                    // Check if Ctrl is pressed for web search
-                    if modifiers.contains(gtk4::gdk::ModifierType::CONTROL_MASK) {
-                        // Ctrl+Enter: Execute web search directly
-                        if search_footer_clone.is_visible() {
-                            let query = search_entry_clone.text().to_string();
-                            debug!("Ctrl+Enter pressed in entry, query: '{}'", query);
-                            if let Some((engine, search_term, url)) = detect_web_search(&query) {
-                                info!("Web search: {} for '{}'", engine, search_term);
-                                // Open URL in default browser (URL built by WebSearchPlugin)
-                                if let Err(e) =
-                                    execute_command(&format!("xdg-open '{}'", url), false)
-                                {
-                                    error!("Failed to open URL: {}", e);
-                                }
-                                window_clone.close();
-                                return;
-                            }
+            let keyboard_event = KeyboardEvent::new(Key::Return, modifiers, query, has_selection);
+
+            // Dispatch to plugins
+            let action = plugin_manager_clone
+                .borrow()
+                .dispatch_keyboard_event(&keyboard_event);
+
+            match action {
+                KeyboardAction::None => {
+                    // No plugin handled it, launch selected item
+                    if let Some((exec, terminal)) = results_list.get_selected_command() {
+                        info!("Launching: {}", exec);
+
+                        // Track usage
+                        if let Some(path) = results_list.get_selected_path() {
+                            usage_tracker_clone.borrow_mut().record_launch(&path);
+                            info!("Recorded launch for {}", path);
                         }
+
+                        if let Err(e) = execute_command(&exec, terminal) {
+                            error!("Failed to launch {}: {}", exec, e);
+                        }
+                        window_clone.close();
                     }
                 }
-            }
-
-            // Regular Enter: Launch selected application or action
-            if let Some((exec, terminal)) = results_list.get_selected_command() {
-                info!("Launching: {}", exec);
-
-                // Track usage
-                if let Some(path) = results_list.get_selected_path() {
-                    usage_tracker_clone.borrow_mut().record_launch(&path);
-                    info!("Recorded launch for {}", path);
+                KeyboardAction::OpenUrl(url) => {
+                    info!("Opening URL from plugin: {}", url);
+                    if let Err(e) = execute_command(&format!("xdg-open '{}'", url), false) {
+                        error!("Failed to open URL: {}", e);
+                    }
+                    window_clone.close();
                 }
-
-                if let Err(e) = execute_command(&exec, terminal) {
-                    error!("Failed to launch {}: {}", exec, e);
+                KeyboardAction::Execute { command, terminal } => {
+                    info!("Executing command from plugin: {}", command);
+                    if let Err(e) = execute_command(&command, terminal) {
+                        error!("Failed to execute command: {}", e);
+                    }
+                    window_clone.close();
                 }
-                window_clone.close();
+                KeyboardAction::Handled => {
+                    // Plugin handled it but don't close window
+                    debug!("Keyboard event handled by plugin");
+                }
             }
         });
     }
@@ -251,12 +262,10 @@ fn build_ui(
         let window_clone = launcher_window.window.clone();
         let usage_tracker_clone = usage_tracker.clone();
         let search_entry_clone = search_widget.entry.clone();
-        let search_footer_clone = search_footer.clone();
+        let plugin_manager_clone = plugin_manager.clone();
 
         let key_controller = gtk4::EventControllerKey::new();
         key_controller.connect_key_pressed(move |_, key, _, modifiers| {
-            use gtk4::gdk::ModifierType;
-
             match key {
                 Key::Escape => {
                     // Close window
@@ -274,41 +283,57 @@ fn build_ui(
                     gtk4::glib::Propagation::Stop
                 }
                 Key::Return => {
-                    // Check if Ctrl is pressed for web search
-                    if modifiers.contains(ModifierType::CONTROL_MASK) {
-                        // Ctrl+Enter: Execute web search directly
-                        if search_footer_clone.is_visible() {
-                            let query = search_entry_clone.text().to_string();
-                            debug!("Ctrl+Enter pressed, query: '{}'", query);
-                            if let Some((engine, search_term, url)) = detect_web_search(&query) {
-                                info!("Web search: {} for '{}'", engine, search_term);
-                                // Open URL in default browser (URL built by WebSearchPlugin)
-                                if let Err(e) =
-                                    execute_command(&format!("xdg-open '{}'", url), false)
-                                {
-                                    error!("Failed to open URL: {}", e);
+                    // Create keyboard event and dispatch to plugins
+                    let query = search_entry_clone.text().to_string();
+                    let has_selection = results_list_clone.get_selected_command().is_some();
+
+                    let keyboard_event = KeyboardEvent::new(key, modifiers, query, has_selection);
+
+                    // Dispatch to plugins - they handle Ctrl+Enter for web search, etc.
+                    let action = plugin_manager_clone
+                        .borrow()
+                        .dispatch_keyboard_event(&keyboard_event);
+
+                    match action {
+                        KeyboardAction::None => {
+                            // No plugin handled it, use default behavior (launch selected item)
+                            if let Some((exec, terminal)) =
+                                results_list_clone.get_selected_command()
+                            {
+                                info!("Launching: {}", exec);
+
+                                // Track usage
+                                if let Some(path) = results_list_clone.get_selected_path() {
+                                    usage_tracker_clone.borrow_mut().record_launch(&path);
+                                    info!("Recorded launch for {}", path);
+                                }
+
+                                if let Err(e) = execute_command(&exec, terminal) {
+                                    error!("Failed to launch {}: {}", exec, e);
                                 }
                                 window_clone.close();
                             }
                         }
-                        return gtk4::glib::Propagation::Stop;
+                        KeyboardAction::OpenUrl(url) => {
+                            info!("Opening URL from plugin: {}", url);
+                            if let Err(e) = execute_command(&format!("xdg-open '{}'", url), false) {
+                                error!("Failed to open URL: {}", e);
+                            }
+                            window_clone.close();
+                        }
+                        KeyboardAction::Execute { command, terminal } => {
+                            info!("Executing command from plugin: {}", command);
+                            if let Err(e) = execute_command(&command, terminal) {
+                                error!("Failed to execute command: {}", e);
+                            }
+                            window_clone.close();
+                        }
+                        KeyboardAction::Handled => {
+                            // Plugin handled it but don't close window
+                            debug!("Keyboard event handled by plugin");
+                        }
                     }
 
-                    // Regular Enter: Launch selected application or action
-                    if let Some((exec, terminal)) = results_list_clone.get_selected_command() {
-                        info!("Launching: {}", exec);
-
-                        // Track usage
-                        if let Some(path) = results_list_clone.get_selected_path() {
-                            usage_tracker_clone.borrow_mut().record_launch(&path);
-                            info!("Recorded launch for {}", path);
-                        }
-
-                        if let Err(e) = execute_command(&exec, terminal) {
-                            error!("Failed to launch {}: {}", exec, e);
-                        }
-                        window_clone.close();
-                    }
                     gtk4::glib::Propagation::Stop
                 }
                 _ => gtk4::glib::Propagation::Proceed,
