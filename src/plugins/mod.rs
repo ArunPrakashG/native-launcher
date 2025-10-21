@@ -1,0 +1,19 @@
+pub mod applications;
+pub mod calculator;
+pub mod editors;
+pub mod files;
+pub mod manager;
+pub mod shell;
+pub mod ssh;
+pub mod traits;
+pub mod web_search;
+
+pub use applications::ApplicationsPlugin;
+pub use calculator::CalculatorPlugin;
+pub use editors::EditorsPlugin;
+pub use files::FileBrowserPlugin;
+pub use manager::PluginManager;
+pub use shell::ShellPlugin;
+pub use ssh::SshPlugin;
+pub use traits::PluginResult;
+pub use web_search::WebSearchPlugin;

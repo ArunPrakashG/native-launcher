@@ -1,0 +1,207 @@
+/* Native Launcher - Nord Theme */
+/* Based on the Nord color palette */
+/* https://www.nordtheme.com */
+
+:root {
+  /* Nord Palette */
+  --nord0: #2e3440; /* Polar Night - darkest */
+  --nord1: #3b4252; /* Polar Night */
+  --nord2: #434c5e; /* Polar Night */
+  --nord3: #4c566a; /* Polar Night - lightest */
+  --nord4: #d8dee9; /* Snow Storm */
+  --nord5: #e5e9f0; /* Snow Storm */
+  --nord6: #eceff4; /* Snow Storm - lightest */
+  --nord7: #8fbcbb; /* Frost - muted cyan */
+  --nord8: #88c0d0; /* Frost - cyan */
+  --nord9: #81a1c1; /* Frost - blue */
+  --nord10: #5e81ac; /* Frost - dark blue */
+  --nord11: #bf616a; /* Aurora - red */
+  --nord12: #d08770; /* Aurora - orange */
+  --nord13: #ebcb8b; /* Aurora - yellow */
+  --nord14: #a3be8c; /* Aurora - green */
+  --nord15: #b48ead; /* Aurora - purple */
+
+  /* Theme Mapping */
+  --primary-color: var(--nord8);
+  --primary-hover: var(--nord7);
+  --primary-active: var(--nord10);
+
+  --bg-primary: var(--nord0);
+  --bg-secondary: var(--nord1);
+  --bg-tertiary: var(--nord2);
+
+  --text-primary: var(--nord6);
+  --text-secondary: var(--nord4);
+  --text-tertiary: var(--nord3);
+  --text-quaternary: #4c566a99;
+
+  --border-color: var(--nord3);
+  --divider-color: var(--nord2);
+
+  --shadow-color: rgba(0, 0, 0, 0.3);
+  --shadow-strong: rgba(0, 0, 0, 0.5);
+
+  --accent-blue: var(--nord9);
+  --accent-green: var(--nord14);
+  --accent-purple: var(--nord15);
+}
+
+/* === Main Window === */
+window {
+  background-color: var(--bg-primary);
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 16px 70px var(--shadow-strong),
+    0 0 0 0.5px rgba(136, 192, 208, 0.05) inset;
+  padding: 0;
+}
+
+/* === Search Entry === */
+entry {
+  font-size: 20px;
+  font-weight: 400;
+  padding: 14px 20px;
+  margin: 12px;
+  border-radius: 10px;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid transparent;
+  box-shadow: none;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+entry:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(136, 192, 208, 0.15);
+  outline: none;
+}
+
+entry placeholder {
+  color: var(--text-tertiary);
+}
+
+/* === Results Container === */
+scrolledwindow {
+  background-color: transparent;
+  border: none;
+  margin: 0 12px 12px 12px;
+}
+
+/* === Results List === */
+listbox {
+  background-color: transparent;
+  border-radius: 10px;
+}
+
+row {
+  background-color: transparent;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 2px 0;
+  transition: all 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+row:hover {
+  background-color: var(--bg-secondary);
+}
+
+row:selected {
+  background-color: var(--primary-color);
+  box-shadow: 0 2px 8px rgba(136, 192, 208, 0.25);
+}
+
+row:selected label {
+  color: var(--nord0);
+}
+
+/* === Application Info === */
+.app-name {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.app-generic {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+row:selected .app-name {
+  color: var(--nord0);
+  font-weight: 600;
+}
+
+row:selected .app-generic {
+  color: var(--nord0);
+  opacity: 0.8;
+}
+
+/* === Desktop Actions === */
+.action-name {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--accent-blue);
+  padding-left: 24px;
+  border-left: 2px solid transparent;
+  transition: all 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+row:hover .action-name {
+  border-left-color: var(--accent-blue);
+}
+
+row:selected .action-name {
+  color: var(--nord0);
+  border-left-color: var(--nord0);
+}
+
+/* === App Icon === */
+.app-icon {
+  margin-right: 12px;
+  border-radius: 8px;
+}
+
+/* === Keyboard Hints === */
+.keyboard-hints {
+  background-color: var(--bg-secondary);
+  border-top: 1px solid var(--border-color);
+  padding: 10px 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.hint-key {
+  background-color: var(--bg-tertiary);
+  color: var(--primary-color);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+  margin: 0 4px;
+  border: 1px solid var(--primary-color);
+  box-shadow: 0 0 6px rgba(136, 192, 208, 0.15);
+}
+
+.hint-text {
+  color: var(--text-secondary);
+  margin: 0 8px;
+}
+
+/* === Scrollbar === */
+scrollbar {
+  background-color: transparent;
+  border: none;
+}
+
+scrollbar slider {
+  background-color: var(--text-quaternary);
+  border-radius: 4px;
+  min-width: 6px;
+  min-height: 6px;
+}
+
+scrollbar slider:hover {
+  background-color: var(--primary-color);
+}

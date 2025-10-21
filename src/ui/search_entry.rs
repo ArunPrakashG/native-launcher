@@ -33,11 +33,15 @@ impl SearchWidget {
     }
 
     /// Get the current search text
+    #[allow(dead_code)]
+
     pub fn text(&self) -> String {
         self.entry.text().to_string()
     }
 
     /// Clear the search text
+    #[allow(dead_code)]
+
     pub fn clear(&self) {
         self.entry.set_text("");
     }

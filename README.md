@@ -1,23 +1,41 @@
 # Native Launcher 🚀
 
-A modern, fast, and beautifully designed application launcher for Linux, written in Rust. Inspired by Raycast's clean design language, built for Wayland with GTK4.
+A modern, fast, and beautifully designed application launcher for Linux, written in Rust. Taking design inspiration from modern launchers like Raycast, built natively for Wayland with GTK4.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Rust](https://img.shields.io/badge/rust-1.75%2B-orange.svg)
 
 ## ✨ Features
 
+### Core Functionality
+
 - ⚡ **Lightning Fast**: Sub-100ms startup, <10ms search latency
-- 🎨 **Raycast-Inspired Design**: Clean, minimal, professional aesthetics
-- 🌊 **Fluid Interactions**: Fast 0.15s transitions, no animation overhead
-- 💎 **Dark Theme**: Professional charcoal background with coral accents
-- 🔍 **Smart Search**: Intelligent matching with relevance scoring
-- 📊 **Usage Learning**: Tracks frequently used apps
+- 🎨 **Modern Design**: Clean, minimal UI with coral accents (#FF6363) on charcoal (#1C1C1E)
+- 🌊 **Fluid Interactions**: Fast 0.15s transitions, 60fps rendering
+- 🔍 **Smart Search**: Intelligent fuzzy matching with relevance scoring
+- 📊 **Usage Learning**: Tracks frequently used apps for better results
+
+### Desktop Integration
+
 - 🎯 **Wayland Native**: Built on gtk4-layer-shell for seamless integration
-- ⌨️ **Keyboard-Driven**: Full keyboard navigation and shortcuts
-- 🎨 **Themeable**: Custom CSS styling support
-- 🔌 **Extensible**: Plugin system for custom functionality
 - 🖥️ **Multi-Monitor**: Smart positioning across displays
+- 🔌 **Desktop Actions**: Right-click menus inline (e.g., Firefox → New Private Window)
+- 🎨 **Icon Support**: Automatic icon resolution from system themes
+
+### Plugin System
+
+- 📁 **Workspace Detection**: Find VS Code/VSCodium workspaces (searches `.vscode`, `.code-workspace` files)
+- 📂 **Recent Files**: Access recently opened files from all editors
+- 🔧 **Calculator**: Instant math evaluation (`2+2`, `sqrt(16)`)
+- 🌐 **Web Search**: Quick search shortcuts (@google, @github, @stackoverflow)
+- 🐚 **Shell Commands**: Execute terminal commands directly
+- 🔌 **Extensible**: Plugin API for custom functionality
+
+### User Experience
+
+- ⌨️ **Keyboard-Driven**: Full keyboard navigation (↑/↓ arrows, Enter, Escape)
+- 🎨 **Themeable**: Custom CSS styling support
+- 🏃 **Background Loading**: Icon cache preloads in background for instant display
 
 ## 🎨 Design Language
 
@@ -31,6 +49,33 @@ Native Launcher follows **Raycast's design principles**:
 - **Subtle Borders**: Minimal separation, maximum clarity
 
 See [RAYCAST_DESIGN.md](RAYCAST_DESIGN.md) for detailed design documentation.
+
+## 🎯 What Makes Native Launcher Special?
+
+### Inline Desktop Actions
+
+Unlike traditional launchers, Native Launcher displays application actions inline:
+
+- **No mode switching**: Actions appear directly under parent apps
+- **Visual clarity**: Indented with coral highlights for easy identification
+- **Fast workflow**: No need to navigate into submenus
+
+### Intelligent Workspace Detection
+
+Automatically finds and displays workspaces from code editors:
+
+- **VS Code/VSCodium**: Searches `~/.config/Code/storage.json` and `.code-workspace` files
+- **Recent projects**: Shows recently opened workspaces first
+- **Parent app icons**: Workspace entries show greyed VS Code icon for context
+
+### Performance First Philosophy
+
+Every feature prioritizes speed:
+
+- **<100ms cold start**: Optimized startup sequence
+- **<10ms search**: Fast fuzzy matching with caching
+- **Background loading**: Icon cache preloads without blocking UI
+- **No heavy animations**: Smooth 60fps transitions
 
 ## Screenshots
 
@@ -94,10 +139,21 @@ _Coming soon: AUR, .deb, .rpm packages_
    See [HOTKEY_SETUP.md](HOTKEY_SETUP.md) for detailed setup instructions for all compositors.
 
 3. **Search & Launch:**
+
    - Type to search applications
    - Use ↑/↓ arrow keys to navigate
    - Press Enter to launch
    - Press Escape to close
+
+4. **Advanced Features:**
+   - **Desktop Actions**: Actions appear inline under parent apps (e.g., Firefox shows "New Window", "Private Window")
+   - **Workspace Search**: Type "code" to see VS Code workspaces from your projects
+   - **Command Search**: Use `@` prefixes for specialized searches:
+     - `@ws` or `@workspace` - Search only workspaces
+     - `@recent` or `@file` - Search recent files
+     - `@calc 2+2` - Calculator
+     - `@google query` - Web search
+     - `@shell ls -la` - Execute shell commands
 
 ### Configuration
 

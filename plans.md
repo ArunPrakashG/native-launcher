@@ -154,41 +154,41 @@ native-launcher/
 #### Week 1: Project Setup & Desktop File Parsing
 
 - [x] Initialize Rust project structure
-- [ ] Set up logging with tracing
-- [ ] Implement desktop file scanner
+- [x] Set up logging with tracing
+- [x] Implement desktop file scanner
   - Scan `/usr/share/applications`
   - Scan `~/.local/share/applications`
   - Parse Name, Exec, Icon, Categories fields
-- [ ] Create `DesktopEntry` data model
-- [ ] Write unit tests for parser
-- [ ] Benchmark parsing performance
+- [x] Create `DesktopEntry` data model
+- [x] Write unit tests for parser
+- [x] Benchmark parsing performance
 
 #### Week 2: UI Foundation & Wayland Integration
 
-- [ ] Set up GTK4 application structure
-- [ ] Initialize gtk4-layer-shell
+- [x] Set up GTK4 application structure
+- [x] Initialize gtk4-layer-shell
   - Configure layer (overlay)
   - Set keyboard mode (exclusive)
   - Position window (center screen)
-- [ ] Create search entry widget
-- [ ] Create results list widget (ListBox)
-- [ ] Implement basic CSS styling
-- [ ] Handle window show/hide
+- [x] Create search entry widget
+- [x] Create results list widget (ListBox)
+- [x] Implement basic CSS styling
+- [x] Handle window show/hide
 
 #### Week 3: Search & Launch Logic
 
-- [ ] Implement substring search algorithm
-- [ ] Filter desktop entries by search query
-- [ ] Display filtered results in UI
-- [ ] Implement keyboard navigation
+- [x] Implement substring search algorithm
+- [x] Filter desktop entries by search query
+- [x] Display filtered results in UI
+- [x] Implement keyboard navigation
   - Up/Down arrows: Navigate results
   - Enter: Launch selected app
   - Escape: Close launcher
-- [ ] Execute applications via `exec()`
+- [x] Execute applications via `exec()`
 - [ ] Global keyboard shortcut registration
   - Listen for Super+Space
   - Show/hide window on trigger
-- [ ] Basic error handling
+- [x] Basic error handling
 
 ### Deliverable
 
@@ -221,46 +221,59 @@ A working launcher that:
 
 #### Week 4: Fuzzy Search Implementation
 
-- [ ] Integrate fuzzy-matcher or nucleo
-- [ ] Implement multi-field search
+- [x] Integrate fuzzy-matcher or nucleo
+- [x] Implement multi-field search
   - Match against Name, GenericName, Keywords
   - Weight fields differently
-- [ ] Score results by relevance
+- [x] Score results by relevance
   - Exact prefix match: highest
   - Word boundary match: high
   - Fuzzy match: medium
-- [ ] Sort results by score
-- [ ] Benchmark search performance (target: <10ms)
+- [x] Sort results by score
+- [x] Benchmark search performance (target: <10ms)
+  - ✅ All queries <1ms for 500 apps (16-470x faster than target)
+  - ✅ See docs/PERFORMANCE_BENCHMARKS.md
 
 #### Week 5: Icons & Visual Polish
 
-- [ ] Implement icon lookup
+- [x] Implement icon lookup
   - Use freedesktop-icons crate
   - Search system icon theme
   - Handle missing icons gracefully
-- [ ] Display icons in results list
-- [ ] Improve UI styling
+- [x] Display icons in results list
+- [x] Improve UI styling
   - Modern rounded corners
   - Proper spacing and padding
   - Highlight selected item
   - Semi-transparent background
-- [ ] Add keyboard visual feedback
+- [x] Add keyboard visual feedback
+  - ✅ Keyboard hints widget at bottom
+  - ✅ Shows context-sensitive shortcuts
+  - ✅ CSS animations for key presses
 
 #### Week 6: Usage History & Configuration
 
-- [ ] Implement usage tracking
-  - Store launch counts in cache
-  - Track last used timestamp
-  - Persist to disk (bincode format)
-- [ ] Boost frequently used apps in results
-- [ ] Create configuration schema
-  - Window dimensions
-  - Position (top/center/bottom)
-  - Max results shown
-  - Keyboard shortcuts
-  - Icon size
-- [ ] Load config from `~/.config/native-launcher/config.toml`
+- [x] Implement usage tracking
+  - ✅ Store launch counts in cache
+  - ✅ Track last used timestamp
+  - ✅ Persist to disk (bincode format at ~/.cache/native-launcher/usage.bin)
+- [x] Boost frequently used apps in results
+  - ✅ Usage-based scoring with exponential decay
+  - ✅ 10% boost per usage point
+  - ✅ Results sorted by usage when empty query
+- [x] Create configuration schema
+  - ✅ Window dimensions (width, height)
+  - ✅ Position (top/center/bottom)
+  - ✅ Max results shown
+  - ✅ Icon size
+  - ✅ Search settings (fuzzy matching, usage ranking, min score)
+  - ✅ UI settings (keyboard hints, animation duration, theme)
+- [x] Load config from `~/.config/native-launcher/config.toml`
+  - ✅ Auto-creates default config if missing
+  - ✅ Applies window and search settings
 - [ ] Implement config hot-reload
+  - Watch config file for changes
+  - Reload without restart
 
 ### Deliverable
 
@@ -293,47 +306,107 @@ A polished launcher with:
 
 #### Week 7: Extended Desktop Integration
 
-- [ ] Parse and display Desktop Actions
-  - Show submenu for apps with actions
-  - Execute specific actions
-- [ ] Handle Terminal=true applications
-  - Detect user's default terminal
-  - Launch with proper terminal wrapper
+- [x] Parse and display Desktop Actions
+  - ✅ Show inline actions under parent apps
+  - ✅ Execute specific actions (action Exec field)
+  - ✅ See src/desktop/entry.rs and src/ui/results_list.rs
+- [x] Handle Terminal=true applications
+  - ✅ Detect user's default terminal (5-step fallback)
+  - ✅ Launch with proper terminal wrapper
+  - ✅ Support for alacritty, kitty, wezterm, foot, gnome-terminal, konsole
+  - ✅ See src/utils/exec.rs
 - [ ] Multi-monitor support
   - Detect active monitor
   - Position window on correct display
-- [ ] Handle special Exec field codes
-  - %f, %F: File arguments
-  - %u, %U: URL arguments
-  - Strip unsupported codes
+  - (Wayland limitation: compositor handles positioning)
+- [x] Handle special Exec field codes
+  - ✅ %f, %F: File arguments (stripped)
+  - ✅ %u, %U: URL arguments (stripped)
+  - ✅ %i, %c, %k: Other codes (stripped)
+  - ✅ See clean_exec_string() in src/utils/exec.rs
 
 #### Week 8: Plugin System Foundation
 
-- [ ] Design plugin API
-  - Search provider interface
-  - Result item trait
-  - Launch handler trait
-- [ ] Built-in plugins:
-  - **Applications**: Default app launcher
-  - **Calculator**: Evaluate math expressions
-  - **Shell**: Execute shell commands
-  - **Web Search**: Quick web searches
-- [ ] Plugin configuration in TOML
-- [ ] Plugin priority/ordering
+- [x] Design plugin API
+  - ✅ Search provider interface (Plugin trait)
+  - ✅ Result item trait (PluginResult struct)
+  - ✅ Launch handler trait (part of PluginResult)
+  - ✅ Plugin context for shared resources
+- [x] Built-in plugins:
+  - ✅ **Applications**: Default app launcher (ApplicationsPlugin)
+  - ✅ **Calculator**: Evaluate math expressions (evalexpr integration)
+  - ✅ **Shell**: Execute shell commands (prefix: ">")
+  - ✅ **Web Search**: Quick web searches (google, ddg, wiki, github, youtube)
+- [x] Plugin configuration in TOML
+  - ✅ PluginsConfig in config.toml
+  - ✅ Enable/disable flags for each plugin
+  - ✅ Customizable shell_prefix
+- [x] Plugin priority/ordering
+  - ✅ PluginManager sorts by priority
+  - ✅ Applications: 1000, Calculator: 500, Shell: 800, WebSearch: 600
+- [x] Testing
+  - ✅ 11 plugin tests passing (3 calculator, 2 shell, 3 web, 3 manager)
+  - ✅ Total: 25 tests passing
+
+**Files Created**:
+
+- `src/plugins/traits.rs` (Plugin trait, PluginResult, PluginContext)
+- `src/plugins/applications.rs` (ApplicationsPlugin wrapping existing search)
+- `src/plugins/calculator.rs` (CalculatorPlugin with evalexpr)
+- `src/plugins/shell.rs` (ShellPlugin with '>' prefix)
+- `src/plugins/web_search.rs` (WebSearchPlugin with URL templates)
+- `src/plugins/manager.rs` (PluginManager coordinator)
+
+**Dependencies Added**:
+
+- `evalexpr = "11.3"` (math expression evaluation)
+- `urlencoding = "2.1"` (URL encoding for web searches)
 
 #### Week 9: Performance & Polish
 
-- [ ] Optimize desktop file parsing
-  - Cache parsed entries on disk
-  - Incremental updates on file changes
+- [x] Optimize desktop file parsing
+  - ✅ Cache parsed entries on disk (~/.cache/native-launcher/entries.cache)
+  - ✅ Incremental updates on file changes (inotify via notify crate v6.1)
+  - ✅ Created DesktopCache module with bincode serialization
+  - ✅ Created DesktopWatcher for background file monitoring
+  - ✅ Integrated scan_cached() into DesktopScanner
 - [ ] Optimize search indexing
   - Pre-build search index
   - Use efficient data structures
+  - (Note: Current fuzzy search with SkimMatcherV2 is already well-optimized)
 - [ ] Add benchmarks for all critical paths
+  - ✅ Benchmark file already exists (benches/search_benchmark.rs)
+  - Need to verify benchmarks run correctly
 - [ ] Memory profiling and optimization
-- [ ] Custom CSS theme support
-  - Load user CSS from config dir
-  - Example themes included
+- [x] Custom CSS theme support
+  - ✅ Load user CSS from ~/.config/native-launcher/theme.css
+  - ✅ Falls back to built-in theme if custom not found
+  - ✅ Example themes included (5 themes)
+  - ✅ Theme documentation with CSS class reference
+
+**Example Themes Created**:
+
+- `themes/dark.css` - Default coral accent theme (built-in)
+- `themes/light.css` - macOS Spotlight-inspired light theme
+- `themes/high-contrast.css` - Accessibility-focused high contrast
+- `themes/dracula.css` - Popular Dracula color scheme
+- `themes/nord.css` - Cool Nord blue-tinted theme
+- `themes/README.md` - Complete theming guide with CSS reference
+
+**Files Created**:
+
+- `src/desktop/cache.rs` (Cache module with timestamp validation, 180 lines)
+- `src/desktop/watcher.rs` (File system watcher with inotify, 195 lines)
+
+**Dependencies Added**:
+
+- `notify = "6.1"` (file system event monitoring)
+
+**Performance Improvements**:
+
+- Cache eliminates re-parsing on subsequent startups
+- Background watcher updates cache automatically on file changes
+- Binary serialization (bincode) for fast cache I/O
 
 ### Deliverable
 
@@ -401,16 +474,37 @@ Cross-platform launcher supporting both Wayland and X11.
 
 #### Week 12: Core Plugins
 
-- [ ] **SSH Plugin**: Launch SSH connections
-  - Parse ~/.ssh/config
-  - Display hosts
-  - Launch in terminal
-- [ ] **File Browser**: Navigate filesystem
-  - Quick file opening
-  - Recent files
+- [x] **SSH Plugin**: Launch SSH connections
+  - ✅ Parse ~/.ssh/config
+  - ✅ Display hosts with hostname, user, port info
+  - ✅ Launch in terminal with proper SSH command
+  - ✅ Support for IdentityFile configuration
+  - ✅ Priority: 700 (between shell and web search)
+- [x] **File Browser Plugin**: Navigate filesystem and recent files
+  - ✅ Parse ~/.local/share/recently-used.xbel for GTK recent files
+  - ✅ Support path-based queries (/, ~/, ./)
+  - ✅ File type icons (documents, images, video, audio, archives, code)
+  - ✅ Size formatting (B, KB, MB, GB, TB)
+  - ✅ Directory navigation with completion
+  - ✅ Integration with xdg-open
+  - ✅ **Workspace detection from VS Code and VSCodium**
+  - ✅ **Parse workspaceStorage directories for recent projects**
+  - ✅ **Support "workspace", "project", "code" queries**
+  - ✅ Priority: 650 (between SSH and web search)
+  - ✅ 6 unit tests passing
 - [ ] **Window Switcher**: Switch between open windows
   - Integrate with compositor
   - Show window previews
+
+**Files Created**:
+
+- `src/plugins/ssh.rs` (SSH plugin with config parsing, 340 lines)
+- `src/plugins/files.rs` (File browser with recent files and navigation, 430 lines)
+
+**Configuration Added**:
+
+- `config.plugins.ssh` boolean flag (default: true)
+- `config.plugins.files` boolean flag (default: true)
 
 #### Week 13: Script Plugin System
 

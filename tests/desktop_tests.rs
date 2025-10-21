@@ -15,6 +15,7 @@ mod tests {
             terminal: false,
             path: PathBuf::from("/test"),
             no_display: false,
+            actions: vec![],
         }
     }
 
@@ -55,6 +56,7 @@ mod tests {
             terminal: false,
             path: std::path::PathBuf::from("/test"),
             no_display: false,
+            actions: vec![],
         };
 
         // Should match on name
@@ -92,6 +94,7 @@ mod tests {
             terminal: false,
             path: PathBuf::from("/test"),
             no_display: false,
+            actions: vec![],
         };
 
         assert!(entry.matches("visual"));
@@ -113,6 +116,7 @@ mod tests {
             terminal: false,
             path: std::path::PathBuf::from("/test"),
             no_display: false,
+            actions: vec![],
         };
 
         // Exact match should score highest
@@ -141,6 +145,7 @@ mod tests {
             terminal: false,
             path: PathBuf::from("/test"),
             no_display: false,
+            actions: vec![],
         };
 
         // Name match should score higher than generic name
@@ -208,6 +213,7 @@ mod tests {
                 terminal: false,
                 path: PathBuf::from("/test1"),
                 no_display: false,
+                actions: vec![],
             },
             DesktopEntry {
                 name: "Firefox".to_string(),
@@ -219,6 +225,7 @@ mod tests {
                 terminal: false,
                 path: PathBuf::from("/test2"),
                 no_display: false,
+                actions: vec![],
             },
         ];
 
@@ -242,6 +249,7 @@ mod tests {
                 terminal: false,
                 path: PathBuf::from("/test1"),
                 no_display: false,
+                actions: vec![],
             },
             DesktopEntry {
                 name: "Hidden App".to_string(),
@@ -253,6 +261,7 @@ mod tests {
                 terminal: false,
                 path: PathBuf::from("/test2"),
                 no_display: true,
+                actions: vec![],
             },
         ];
 
@@ -276,6 +285,7 @@ mod tests {
             terminal: true,
             path: PathBuf::from("/test"),
             no_display: false,
+            actions: vec![],
         };
 
         assert!(terminal_entry.terminal);

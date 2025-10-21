@@ -1,0 +1,203 @@
+/* Native Launcher - Dracula Theme */
+/* Based on the popular Dracula color scheme */
+/* https://draculatheme.com */
+
+:root {
+  /* Dracula Colors */
+  --dracula-bg: #282a36;
+  --dracula-current: #44475a;
+  --dracula-selection: #44475a;
+  --dracula-fg: #f8f8f2;
+  --dracula-comment: #6272a4;
+  --dracula-cyan: #8be9fd;
+  --dracula-green: #50fa7b;
+  --dracula-orange: #ffb86c;
+  --dracula-pink: #ff79c6;
+  --dracula-purple: #bd93f9;
+  --dracula-red: #ff5555;
+  --dracula-yellow: #f1fa8c;
+
+  /* Theme Mapping */
+  --primary-color: var(--dracula-purple);
+  --primary-hover: #cba6ff;
+  --primary-active: #a980f2;
+
+  --bg-primary: var(--dracula-bg);
+  --bg-secondary: var(--dracula-current);
+  --bg-tertiary: #4d5066;
+
+  --text-primary: var(--dracula-fg);
+  --text-secondary: var(--dracula-comment);
+  --text-tertiary: #6272a499;
+  --text-quaternary: #6272a44d;
+
+  --border-color: var(--dracula-selection);
+  --divider-color: var(--dracula-current);
+
+  --shadow-color: rgba(0, 0, 0, 0.4);
+  --shadow-strong: rgba(0, 0, 0, 0.6);
+
+  --accent-cyan: var(--dracula-cyan);
+  --accent-green: var(--dracula-green);
+  --accent-pink: var(--dracula-pink);
+}
+
+/* === Main Window === */
+window {
+  background-color: var(--bg-primary);
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 16px 70px var(--shadow-strong),
+    0 0 0 0.5px rgba(189, 147, 249, 0.1) inset;
+  padding: 0;
+}
+
+/* === Search Entry === */
+entry {
+  font-size: 20px;
+  font-weight: 400;
+  padding: 14px 20px;
+  margin: 12px;
+  border-radius: 10px;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid transparent;
+  box-shadow: none;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+entry:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(189, 147, 249, 0.2);
+  outline: none;
+}
+
+entry placeholder {
+  color: var(--text-secondary);
+}
+
+/* === Results Container === */
+scrolledwindow {
+  background-color: transparent;
+  border: none;
+  margin: 0 12px 12px 12px;
+}
+
+/* === Results List === */
+listbox {
+  background-color: transparent;
+  border-radius: 10px;
+}
+
+row {
+  background-color: transparent;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 2px 0;
+  transition: all 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+row:hover {
+  background-color: var(--bg-secondary);
+}
+
+row:selected {
+  background-color: var(--primary-color);
+  box-shadow: 0 2px 8px rgba(189, 147, 249, 0.3);
+}
+
+row:selected label {
+  color: var(--dracula-bg);
+}
+
+/* === Application Info === */
+.app-name {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.app-generic {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+row:selected .app-name {
+  color: var(--dracula-bg);
+  font-weight: 600;
+}
+
+row:selected .app-generic {
+  color: var(--dracula-bg);
+  opacity: 0.8;
+}
+
+/* === Desktop Actions === */
+.action-name {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--accent-pink);
+  padding-left: 24px;
+  border-left: 2px solid transparent;
+  transition: all 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+row:hover .action-name {
+  border-left-color: var(--accent-pink);
+}
+
+row:selected .action-name {
+  color: var(--dracula-bg);
+  border-left-color: var(--dracula-bg);
+}
+
+/* === App Icon === */
+.app-icon {
+  margin-right: 12px;
+  border-radius: 8px;
+}
+
+/* === Keyboard Hints === */
+.keyboard-hints {
+  background-color: var(--bg-secondary);
+  border-top: 1px solid var(--border-color);
+  padding: 10px 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.hint-key {
+  background-color: var(--bg-tertiary);
+  color: var(--primary-color);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+  margin: 0 4px;
+  border: 1px solid var(--primary-color);
+  box-shadow: 0 0 8px rgba(189, 147, 249, 0.2);
+}
+
+.hint-text {
+  color: var(--text-secondary);
+  margin: 0 8px;
+}
+
+/* === Scrollbar === */
+scrollbar {
+  background-color: transparent;
+  border: none;
+}
+
+scrollbar slider {
+  background-color: var(--text-quaternary);
+  border-radius: 4px;
+  min-width: 6px;
+  min-height: 6px;
+}
+
+scrollbar slider:hover {
+  background-color: var(--primary-color);
+}

@@ -1,0 +1,178 @@
+/* Native Launcher - Light Theme */
+
+/* === Light Theme Color Palette === */
+:root {
+  /* Primary Colors - macOS Blue */
+  --primary-color: #007aff;
+  --primary-hover: #0051d5;
+  --primary-active: #003d99;
+
+  /* Background Colors - Light Gray */
+  --bg-primary: #f5f5f7;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #e8e8ed;
+
+  /* Text Colors */
+  --text-primary: #1d1d1f;
+  --text-secondary: #86868b;
+  --text-tertiary: #86868b99;
+  --text-quaternary: #86868b4d;
+
+  /* Border & Divider Colors */
+  --border-color: #d2d2d7;
+  --divider-color: #d2d2d7;
+
+  /* Shadow Colors */
+  --shadow-color: rgba(0, 0, 0, 0.1);
+  --shadow-strong: rgba(0, 0, 0, 0.15);
+}
+
+/* === Main Window === */
+window {
+  background-color: var(--bg-primary);
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 16px 70px var(--shadow-strong),
+    0 0 0 0.5px rgba(0, 0, 0, 0.05) inset;
+  padding: 0;
+}
+
+/* === Search Entry === */
+entry {
+  font-size: 20px;
+  font-weight: 400;
+  padding: 14px 20px;
+  margin: 12px;
+  border-radius: 10px;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 1px 3px var(--shadow-color);
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+entry:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+  outline: none;
+}
+
+entry placeholder {
+  color: var(--text-tertiary);
+}
+
+/* === Results Container === */
+scrolledwindow {
+  background-color: transparent;
+  border: none;
+  margin: 0 12px 12px 12px;
+}
+
+/* === Results List === */
+listbox {
+  background-color: transparent;
+  border-radius: 10px;
+}
+
+row {
+  background-color: transparent;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 2px 0;
+  transition: all 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+row:hover {
+  background-color: var(--bg-tertiary);
+}
+
+row:selected {
+  background-color: var(--primary-color);
+}
+
+row:selected label {
+  color: #ffffff;
+}
+
+/* === Application Info === */
+.app-name {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.app-generic {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+row:selected .app-name,
+row:selected .app-generic {
+  color: #ffffff;
+}
+
+/* === Desktop Actions === */
+.action-name {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--primary-color);
+  padding-left: 24px;
+  border-left: 2px solid transparent;
+  transition: all 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+row:selected .action-name {
+  color: #ffffff;
+  border-left-color: rgba(255, 255, 255, 0.3);
+}
+
+/* === App Icon === */
+.app-icon {
+  margin-right: 12px;
+  border-radius: 8px;
+}
+
+/* === Keyboard Hints === */
+.keyboard-hints {
+  background-color: var(--bg-secondary);
+  border-top: 1px solid var(--border-color);
+  padding: 10px 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.hint-key {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+  margin: 0 4px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 1px 2px var(--shadow-color);
+}
+
+.hint-text {
+  color: var(--text-secondary);
+  margin: 0 8px;
+}
+
+/* === Scrollbar === */
+scrollbar {
+  background-color: transparent;
+  border: none;
+}
+
+scrollbar slider {
+  background-color: var(--text-quaternary);
+  border-radius: 4px;
+  min-width: 6px;
+  min-height: 6px;
+}
+
+scrollbar slider:hover {
+  background-color: var(--text-tertiary);
+}

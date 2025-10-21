@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use tracing::{debug, info, warn};
 use walkdir::WalkDir;
 
+use super::cache::DesktopCache;
 use super::entry::DesktopEntry;
 
 /// Scans system directories for .desktop files
@@ -37,16 +38,22 @@ impl DesktopScanner {
     }
 
     /// Add a custom search path
+    #[allow(dead_code)]
+
     pub fn add_path(&mut self, path: PathBuf) {
         self.search_paths.push(path);
     }
 
     /// Get the configured search paths
+    #[allow(dead_code)]
+
     pub fn paths(&self) -> &[PathBuf] {
         &self.search_paths
     }
 
     /// Scan all configured paths and return desktop entries
+    #[allow(dead_code)]
+
     pub fn scan(&self) -> Result<Vec<DesktopEntry>> {
         info!("Starting desktop file scan");
         let mut entries = Vec::new();
@@ -76,7 +83,89 @@ impl DesktopScanner {
         Ok(entries)
     }
 
+    /// Scan with caching for faster startup
+    pub fn scan_cached(&self) -> Result<Vec<DesktopEntry>> {
+        info!("Starting cached desktop file scan");
+
+        // Try to load existing cache
+        let mut cache = DesktopCache::load().unwrap_or_else(|e| {
+            warn!("Failed to load cache: {}, building new cache", e);
+            DesktopCache::new()
+        });
+
+        // Prune deleted files
+        cache.prune();
+
+        let mut entries = Vec::new();
+        let mut cache_hits = 0;
+        let mut cache_misses = 0;
+
+        for path in &self.search_paths {
+            if !path.exists() {
+                debug!("Skipping non-existent path: {}", path.display());
+                continue;
+            }
+
+            info!("Scanning directory: {}", path.display());
+
+            for entry in WalkDir::new(path)
+                .follow_links(true)
+                .max_depth(3)
+                .into_iter()
+                .filter_map(|e| e.ok())
+            {
+                let file_path = entry.path();
+
+                // Only process .desktop files
+                if file_path.extension().and_then(|s| s.to_str()) != Some("desktop") {
+                    continue;
+                }
+
+                // Try cache first
+                if let Some(cached_entry) = cache.get(file_path) {
+                    cache_hits += 1;
+                    if !cached_entry.no_display {
+                        entries.push(cached_entry.clone());
+                    }
+                } else {
+                    // Cache miss - parse file
+                    cache_misses += 1;
+                    match DesktopEntry::from_file(file_path.to_path_buf()) {
+                        Ok(desktop_entry) => {
+                            if !desktop_entry.no_display {
+                                debug!("Parsed: {}", desktop_entry.name);
+                                entries.push(desktop_entry.clone());
+                            }
+                            // Update cache
+                            if let Err(e) = cache.insert(file_path.to_path_buf(), desktop_entry) {
+                                warn!("Failed to cache {}: {}", file_path.display(), e);
+                            }
+                        }
+                        Err(e) => {
+                            debug!("Failed to parse {}: {}", file_path.display(), e);
+                        }
+                    }
+                }
+            }
+        }
+
+        info!("Cache stats: {} hits, {} misses", cache_hits, cache_misses);
+
+        // Save updated cache
+        if let Err(e) = cache.save() {
+            warn!("Failed to save cache: {}", e);
+        }
+
+        // Remove duplicates
+        entries = self.deduplicate_entries(entries);
+
+        info!("Scan complete: {} total entries", entries.len());
+        Ok(entries)
+    }
+
     /// Scan a single directory for .desktop files
+    #[allow(dead_code)]
+
     fn scan_directory(&self, path: &Path) -> Result<Vec<DesktopEntry>> {
         let mut entries = Vec::new();
 
@@ -122,8 +211,8 @@ impl DesktopScanner {
         // Process in reverse order so user entries (which come later) override system entries
         for entry in entries.into_iter().rev() {
             let key = entry.name.clone();
-            if !seen.contains_key(&key) {
-                seen.insert(key, ());
+            if let std::collections::hash_map::Entry::Vacant(e) = seen.entry(key) {
+                e.insert(());
                 result.push(entry);
             }
         }

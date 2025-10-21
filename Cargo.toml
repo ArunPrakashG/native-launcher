@@ -2,10 +2,10 @@
 name = "native-launcher"
 version = "0.1.0"
 edition = "2021"
-authors = ["Your Name <your.email@example.com>"]
+authors = ["Arun Prakash <hi@arunprakashg.com>"]
 description = "A modern application launcher for Linux with Wayland support"
 license = "MIT"
-repository = "https://github.com/yourusername/native-launcher"
+repository = "https://github.com/ArunPrakashG/native-launcher"
 
 [[bin]]
 name = "native-launcher"
@@ -34,6 +34,7 @@ nucleo = "0.5"
 
 # Serialization for config
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 toml = "0.8"
 
 # Error handling
@@ -48,8 +49,17 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 dirs = "5.0"
 walkdir = "2.5"
 
+# File system watching
+notify = "6.1"
+
 # Caching
 bincode = "1.3"
+
+# Expression evaluation (for calculator plugin)
+evalexpr = "11.3"
+
+# URL encoding (for web search plugin)
+urlencoding = "2.1"
 
 [dev-dependencies]
 criterion = "0.5"

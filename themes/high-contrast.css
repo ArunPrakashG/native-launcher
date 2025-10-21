@@ -1,0 +1,185 @@
+/* Native Launcher - High Contrast Theme */
+/* Optimized for accessibility and visibility */
+
+:root {
+  /* Primary Colors - Bright Yellow for maximum contrast */
+  --primary-color: #ffff00;
+  --primary-hover: #ffff33;
+  --primary-active: #cccc00;
+
+  /* Background Colors - Pure Black */
+  --bg-primary: #000000;
+  --bg-secondary: #1a1a1a;
+  --bg-tertiary: #2d2d2d;
+
+  /* Text Colors - Pure White */
+  --text-primary: #ffffff;
+  --text-secondary: #ffffff;
+  --text-tertiary: #cccccc;
+  --text-quaternary: #999999;
+
+  /* Border Colors - High Contrast */
+  --border-color: #ffffff;
+  --divider-color: #ffffff;
+
+  /* Shadow Colors */
+  --shadow-color: rgba(255, 255, 255, 0.2);
+  --shadow-strong: rgba(255, 255, 255, 0.3);
+}
+
+/* === Main Window === */
+window {
+  background-color: var(--bg-primary);
+  border-radius: 12px;
+  border: 2px solid var(--border-color);
+  box-shadow: 0 0 20px var(--shadow-strong);
+  padding: 0;
+}
+
+/* === Search Entry === */
+entry {
+  font-size: 22px;
+  font-weight: 600;
+  padding: 16px 22px;
+  margin: 14px;
+  border-radius: 8px;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 2px solid var(--border-color);
+  box-shadow: none;
+  transition: all 0.1s ease;
+}
+
+entry:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 4px rgba(255, 255, 0, 0.3);
+  outline: none;
+}
+
+entry placeholder {
+  color: var(--text-tertiary);
+  font-weight: 500;
+}
+
+/* === Results Container === */
+scrolledwindow {
+  background-color: transparent;
+  border: none;
+  margin: 0 14px 14px 14px;
+}
+
+/* === Results List === */
+listbox {
+  background-color: transparent;
+  border-radius: 8px;
+}
+
+row {
+  background-color: var(--bg-secondary);
+  border: 2px solid transparent;
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin: 3px 0;
+  transition: all 0.1s ease;
+}
+
+row:hover {
+  border-color: var(--primary-color);
+  background-color: var(--bg-tertiary);
+}
+
+row:selected {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+row:selected label {
+  color: #000000;
+  font-weight: 700;
+}
+
+/* === Application Info === */
+.app-name {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.app-generic {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-top: 3px;
+}
+
+row:selected .app-name,
+row:selected .app-generic {
+  color: #000000;
+}
+
+/* === Desktop Actions === */
+.action-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--primary-color);
+  padding-left: 28px;
+  border-left: 3px solid var(--primary-color);
+  transition: all 0.1s ease;
+}
+
+row:selected .action-name {
+  color: #000000;
+  border-left-color: #000000;
+}
+
+/* === App Icon === */
+.app-icon {
+  margin-right: 14px;
+  border-radius: 6px;
+  border: 2px solid var(--border-color);
+}
+
+/* === Keyboard Hints === */
+.keyboard-hints {
+  background-color: var(--bg-secondary);
+  border-top: 2px solid var(--border-color);
+  padding: 12px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.hint-key {
+  background-color: var(--bg-tertiary);
+  color: var(--primary-color);
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-weight: 700;
+  margin: 0 6px;
+  border: 2px solid var(--primary-color);
+  box-shadow: none;
+}
+
+.hint-text {
+  color: var(--text-primary);
+  font-weight: 600;
+  margin: 0 8px;
+}
+
+/* === Scrollbar === */
+scrollbar {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+}
+
+scrollbar slider {
+  background-color: var(--primary-color);
+  border-radius: 3px;
+  min-width: 10px;
+  min-height: 10px;
+  border: 1px solid #000000;
+}
+
+scrollbar slider:hover {
+  background-color: var(--primary-hover);
+}

@@ -1,19 +1,24 @@
+mod config;
 mod desktop;
+mod plugins;
 mod search;
 mod ui;
+mod usage;
 mod utils;
 
 use anyhow::Result;
-use desktop::{DesktopEntry, DesktopScanner};
+use config::ConfigLoader;
+use desktop::DesktopScanner;
 use gtk4::gdk::{Display, Key};
 use gtk4::prelude::*;
 use gtk4::{Application, Box as GtkBox, CssProvider, Orientation};
-use search::SearchEngine;
+use plugins::PluginManager;
 use std::cell::RefCell;
 use std::rc::Rc;
-use tracing::{error, info};
+use tracing::{debug, error, info, warn};
 use tracing_subscriber::EnvFilter;
-use ui::{LauncherWindow, ResultsList, SearchWidget};
+use ui::{KeyboardHints, LauncherWindow, ResultsList, SearchWidget};
+use usage::UsageTracker;
 use utils::execute_command;
 
 const APP_ID: &str = "com.github.native-launcher";
@@ -28,24 +33,66 @@ fn main() -> Result<()> {
 
     info!("Starting Native Launcher");
 
+    // Load configuration
+    info!("Loading configuration...");
+    let config_loader = ConfigLoader::load().unwrap_or_else(|e| {
+        error!("Failed to load config: {}, using defaults", e);
+        ConfigLoader::new()
+    });
+    let config = config_loader.config().clone();
+    info!("Config loaded from {:?}", config_loader.path());
+
+    // Load usage tracking data
+    info!("Loading usage tracking data...");
+    let usage_tracker = UsageTracker::load().unwrap_or_else(|e| {
+        error!("Failed to load usage data: {}, starting fresh", e);
+        UsageTracker::new()
+    });
+    info!("Loaded usage data for {} apps", usage_tracker.app_count());
+
     // Scan for desktop applications
     info!("Scanning for desktop applications...");
     let scanner = DesktopScanner::new();
-    let entries = scanner.scan()?;
+    let entries = scanner.scan_cached()?;
     info!("Found {} applications", entries.len());
 
-    // Create search engine
-    let search_engine = Rc::new(RefCell::new(SearchEngine::new(entries.clone())));
+    // Start background icon cache preloading
+    info!("Starting icon cache preloading in background...");
+    let entries_for_cache = entries.clone();
+    std::thread::spawn(move || {
+        utils::icons::preload_icon_cache(&entries_for_cache);
+    });
+
+    // Create plugin manager with all plugins
+    info!("Initializing plugin system...");
+    let plugin_manager = Rc::new(RefCell::new(PluginManager::new(
+        entries.clone(),
+        Some(usage_tracker.clone()),
+        &config,
+    )));
+    info!(
+        "Enabled plugins: {:?}",
+        plugin_manager.borrow().enabled_plugins()
+    );
+
+    // Wrap usage tracker for shared access
+    let usage_tracker_rc = Rc::new(RefCell::new(usage_tracker));
 
     // Create GTK application
     let app = Application::builder().application_id(APP_ID).build();
 
-    // Store entries for use in activate
-    let entries_clone = entries.clone();
-    let search_engine_clone = search_engine.clone();
+    // Store plugin manager and config for use in activate
+    let plugin_manager_clone = plugin_manager.clone();
+    let usage_tracker_clone = usage_tracker_rc.clone();
+    let config_clone = config.clone();
 
     app.connect_activate(move |app| {
-        if let Err(e) = build_ui(app, &entries_clone, search_engine_clone.clone()) {
+        if let Err(e) = build_ui(
+            app,
+            plugin_manager_clone.clone(),
+            usage_tracker_clone.clone(),
+            &config_clone,
+        ) {
             error!("Failed to build UI: {}", e);
             app.quit();
         }
@@ -58,24 +105,70 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+/// Detect if query is a web search and extract engine + search term + URL
+/// Uses WebSearchPlugin to handle all web search logic
+fn detect_web_search(query: &str) -> Option<(String, String, String)> {
+    let web_search = plugins::WebSearchPlugin::new();
+    web_search.build_search_url(query)
+}
+
+/// Get default browser name for display
+fn get_default_browser() -> String {
+    // Try to get default browser from xdg-settings
+    if let Ok(output) = std::process::Command::new("xdg-settings")
+        .args(["get", "default-web-browser"])
+        .output()
+    {
+        if output.status.success() {
+            if let Ok(browser_desktop) = String::from_utf8(output.stdout) {
+                // Extract browser name from .desktop file (e.g., "firefox.desktop" -> "Firefox")
+                let name = browser_desktop
+                    .trim()
+                    .trim_end_matches(".desktop")
+                    .split('-')
+                    .next()
+                    .unwrap_or("Browser");
+                return name[0..1].to_uppercase() + &name[1..];
+            }
+        }
+    }
+
+    "Browser".to_string()
+}
+
 fn build_ui(
     app: &Application,
-    entries: &[DesktopEntry],
-    search_engine: Rc<RefCell<SearchEngine>>,
+    plugin_manager: Rc<RefCell<PluginManager>>,
+    usage_tracker: Rc<RefCell<UsageTracker>>,
+    config: &config::Config,
 ) -> Result<()> {
     info!("Building UI");
 
     // Load CSS
     load_css();
 
-    // Create main window
+    // Create main window with config
     let launcher_window = LauncherWindow::new(app);
+
+    // Apply window config
+    launcher_window
+        .window
+        .set_default_width(config.window.width);
+    launcher_window
+        .window
+        .set_default_height(config.window.height);
 
     // Create search widget
     let search_widget = SearchWidget::new();
 
     // Create results list
     let results_list = ResultsList::new();
+
+    // Create search footer
+    let search_footer = ui::SearchFooter::new();
+
+    // Create keyboard hints
+    let keyboard_hints = KeyboardHints::new();
 
     // Create main container
     let main_box = GtkBox::builder()
@@ -85,37 +178,119 @@ fn build_ui(
 
     main_box.append(&search_widget.container);
     main_box.append(&results_list.container);
+    main_box.append(&search_footer.container);
+    main_box.append(&keyboard_hints.container);
 
     launcher_window.window.set_child(Some(&main_box));
 
-    // Initial results (show all)
-    let initial_results: Vec<&DesktopEntry> = entries.iter().collect();
-    results_list.update_results(initial_results.into_iter().take(10).collect());
+    // Initial results (show all apps) - use max_results from config
+    let max_results = config.search.max_results;
+    match plugin_manager.borrow().search("", max_results) {
+        Ok(initial_results) => results_list.update_plugin_results(initial_results),
+        Err(e) => error!("Failed to get initial results: {}", e),
+    }
 
     // Handle search text changes
     {
         let results_list = results_list.clone();
-        let search_engine = search_engine.clone();
+        let search_footer_clone = search_footer.clone();
+        let plugin_manager = plugin_manager.clone();
+        let max_results = config.search.max_results;
 
         search_widget.entry.connect_changed(move |entry| {
             let query = entry.text().to_string();
-            let engine = search_engine.borrow();
-            let results = engine.search(&query, 10);
-            results_list.update_results(results);
+            let manager = plugin_manager.borrow();
+
+            // Check if this is a web search query
+            if let Some((engine, search_term, _url)) = detect_web_search(&query) {
+                // Show footer with web search info
+                let browser = get_default_browser();
+                search_footer_clone.update(&engine, &search_term, &browser);
+                search_footer_clone.show();
+            } else {
+                // Hide footer for non-web-search queries
+                search_footer_clone.hide();
+            }
+
+            match manager.search(&query, max_results) {
+                Ok(results) => results_list.update_plugin_results(results),
+                Err(e) => error!("Search failed: {}", e),
+            }
+        });
+    }
+
+    // Handle Enter key in search entry
+    {
+        let results_list = results_list.clone();
+        let window_clone = launcher_window.window.clone();
+        let usage_tracker_clone = usage_tracker.clone();
+        let search_entry_clone = search_widget.entry.clone();
+        let search_footer_clone = search_footer.clone();
+
+        search_widget.entry.connect_activate(move |entry| {
+            // Get current event to check modifiers
+            let display = entry.display();
+            let seat = display.default_seat();
+
+            if let Some(seat) = seat {
+                if let Some(keyboard) = seat.keyboard() {
+                    let modifiers = keyboard.modifier_state();
+
+                    // Check if Ctrl is pressed for web search
+                    if modifiers.contains(gtk4::gdk::ModifierType::CONTROL_MASK) {
+                        // Ctrl+Enter: Execute web search directly
+                        if search_footer_clone.is_visible() {
+                            let query = search_entry_clone.text().to_string();
+                            debug!("Ctrl+Enter pressed in entry, query: '{}'", query);
+                            if let Some((engine, search_term, url)) = detect_web_search(&query) {
+                                info!("Web search: {} for '{}'", engine, search_term);
+                                // Open URL in default browser (URL built by WebSearchPlugin)
+                                if let Err(e) =
+                                    execute_command(&format!("xdg-open '{}'", url), false)
+                                {
+                                    error!("Failed to open URL: {}", e);
+                                }
+                                window_clone.close();
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Regular Enter: Launch selected application or action
+            if let Some((exec, terminal)) = results_list.get_selected_command() {
+                info!("Launching: {}", exec);
+
+                // Track usage
+                if let Some(path) = results_list.get_selected_path() {
+                    usage_tracker_clone.borrow_mut().record_launch(&path);
+                    info!("Recorded launch for {}", path);
+                }
+
+                if let Err(e) = execute_command(&exec, terminal) {
+                    error!("Failed to launch {}: {}", exec, e);
+                }
+                window_clone.close();
+            }
         });
     }
 
     // Handle keyboard events
     {
-        let search_widget_clone = search_widget.clone();
         let results_list_clone = results_list.clone();
         let window_clone = launcher_window.window.clone();
+        let usage_tracker_clone = usage_tracker.clone();
+        let search_entry_clone = search_widget.entry.clone();
+        let search_footer_clone = search_footer.clone();
 
         let key_controller = gtk4::EventControllerKey::new();
-        key_controller.connect_key_pressed(move |_, key, _, _| {
+        key_controller.connect_key_pressed(move |_, key, _, modifiers| {
+            use gtk4::gdk::ModifierType;
+
             match key {
                 Key::Escape => {
-                    // Close window on Escape
+                    // Close window
                     window_clone.close();
                     gtk4::glib::Propagation::Stop
                 }
@@ -130,19 +305,40 @@ fn build_ui(
                     gtk4::glib::Propagation::Stop
                 }
                 Key::Return => {
-                    // Launch selected application
-                    if let Some(index) = results_list_clone.selected_index() {
-                        let query = search_widget_clone.text();
-                        let engine = search_engine.borrow();
-                        let results = engine.search(&query, 10);
-
-                        if let Some(entry) = results.get(index as usize) {
-                            info!("Launching: {}", entry.name);
-                            if let Err(e) = execute_command(&entry.exec, entry.terminal) {
-                                error!("Failed to launch {}: {}", entry.name, e);
+                    // Check if Ctrl is pressed for web search
+                    if modifiers.contains(ModifierType::CONTROL_MASK) {
+                        // Ctrl+Enter: Execute web search directly
+                        if search_footer_clone.is_visible() {
+                            let query = search_entry_clone.text().to_string();
+                            debug!("Ctrl+Enter pressed, query: '{}'", query);
+                            if let Some((engine, search_term, url)) = detect_web_search(&query) {
+                                info!("Web search: {} for '{}'", engine, search_term);
+                                // Open URL in default browser (URL built by WebSearchPlugin)
+                                if let Err(e) =
+                                    execute_command(&format!("xdg-open '{}'", url), false)
+                                {
+                                    error!("Failed to open URL: {}", e);
+                                }
+                                window_clone.close();
                             }
-                            window_clone.close();
                         }
+                        return gtk4::glib::Propagation::Stop;
+                    }
+
+                    // Regular Enter: Launch selected application or action
+                    if let Some((exec, terminal)) = results_list_clone.get_selected_command() {
+                        info!("Launching: {}", exec);
+
+                        // Track usage
+                        if let Some(path) = results_list_clone.get_selected_path() {
+                            usage_tracker_clone.borrow_mut().record_launch(&path);
+                            info!("Recorded launch for {}", path);
+                        }
+
+                        if let Err(e) = execute_command(&exec, terminal) {
+                            error!("Failed to launch {}: {}", exec, e);
+                        }
+                        window_clone.close();
                     }
                     gtk4::glib::Propagation::Stop
                 }
@@ -163,8 +359,41 @@ fn build_ui(
 
 fn load_css() {
     let provider = CssProvider::new();
-    let css = include_str!("ui/style.css");
-    provider.load_from_data(css);
+
+    // Try to load user theme first
+    let custom_theme_path =
+        dirs::config_dir().map(|config| config.join("native-launcher").join("theme.css"));
+
+    let css_loaded = if let Some(theme_path) = custom_theme_path {
+        if theme_path.exists() {
+            info!("Loading custom theme from: {}", theme_path.display());
+            match std::fs::read_to_string(&theme_path) {
+                Ok(css_content) => {
+                    provider.load_from_data(&css_content);
+                    true
+                }
+                Err(e) => {
+                    warn!(
+                        "Failed to read custom theme: {}, falling back to default",
+                        e
+                    );
+                    false
+                }
+            }
+        } else {
+            debug!("No custom theme found at: {}", theme_path.display());
+            false
+        }
+    } else {
+        false
+    };
+
+    // Fall back to built-in CSS if custom theme not loaded
+    if !css_loaded {
+        info!("Loading built-in theme");
+        let css = include_str!("ui/style.css");
+        provider.load_from_data(css);
+    }
 
     if let Some(display) = Display::default() {
         gtk4::style_context_add_provider_for_display(

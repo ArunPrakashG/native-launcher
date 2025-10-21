@@ -1,8 +1,22 @@
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+/// Represents a Desktop Action (context action) for an application
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DesktopAction {
+    /// Action identifier (e.g., "new-window")
+    pub id: String,
+    /// Display name for the action
+    pub name: String,
+    /// Command to execute for this action
+    pub exec: String,
+    /// Icon for this action (optional)
+    pub icon: Option<String>,
+}
+
 /// Represents a parsed desktop application entry
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DesktopEntry {
     /// Application name
     pub name: String,
@@ -22,6 +36,8 @@ pub struct DesktopEntry {
     pub path: PathBuf,
     /// Whether the entry should be shown
     pub no_display: bool,
+    /// Available desktop actions (context actions)
+    pub actions: Vec<DesktopAction>,
 }
 
 impl DesktopEntry {
@@ -65,6 +81,9 @@ impl DesktopEntry {
         let terminal = entry.terminal();
         let no_display = entry.no_display();
 
+        // Parse desktop actions
+        let actions = Self::parse_actions(&entry, &path)?;
+
         Ok(DesktopEntry {
             name,
             generic_name,
@@ -75,10 +94,77 @@ impl DesktopEntry {
             terminal,
             path,
             no_display,
+            actions,
         })
     }
 
+    /// Parse desktop actions from a .desktop file
+    fn parse_actions(
+        entry: &freedesktop_desktop_entry::DesktopEntry,
+        path: &PathBuf,
+    ) -> Result<Vec<DesktopAction>> {
+        use std::fs;
+
+        let mut actions = Vec::new();
+
+        // Get the Actions field (semicolon-separated list of action IDs)
+        let actions_iter = match entry.actions() {
+            Some(acts) => acts,
+            None => return Ok(actions),
+        };
+
+        // Read the file to parse action sections manually
+        // (freedesktop_desktop_entry doesn't expose action sections directly)
+        let content = fs::read_to_string(path)?;
+
+        for action_id in actions_iter {
+            let section_header = format!("[Desktop Action {}]", action_id.trim());
+
+            if let Some(section_start) = content.find(&section_header) {
+                // Find the section content (until next [ or end of file)
+                let section_content = &content[section_start..];
+                let section_end = section_content.find("\n[").unwrap_or(section_content.len());
+                let section = &section_content[..section_end];
+
+                // Parse Name field
+                let name =
+                    Self::parse_field(section, "Name=").unwrap_or_else(|| action_id.to_string());
+
+                // Parse Exec field
+                let exec = match Self::parse_field(section, "Exec=") {
+                    Some(e) => e,
+                    None => continue, // Skip actions without Exec
+                };
+
+                // Parse Icon field (optional)
+                let icon = Self::parse_field(section, "Icon=");
+
+                actions.push(DesktopAction {
+                    id: action_id.trim().to_string(),
+                    name,
+                    exec,
+                    icon,
+                });
+            }
+        }
+
+        Ok(actions)
+    }
+
+    /// Helper to parse a field from a desktop file section
+    fn parse_field(section: &str, field_name: &str) -> Option<String> {
+        for line in section.lines() {
+            let line = line.trim();
+            if line.starts_with(field_name) {
+                return Some(line[field_name.len()..].trim().to_string());
+            }
+        }
+        None
+    }
+
     /// Check if this entry matches a search query
+    #[allow(dead_code)]
+
     pub fn matches(&self, query: &str) -> bool {
         let query_lower = query.to_lowercase();
 
@@ -112,6 +198,8 @@ impl DesktopEntry {
     }
 
     /// Get a score for how well this entry matches the query (0-100)
+    #[allow(dead_code)]
+
     pub fn match_score(&self, query: &str) -> u32 {
         if query.is_empty() {
             return 50; // Neutral score for empty query

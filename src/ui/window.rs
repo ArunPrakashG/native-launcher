@@ -3,6 +3,7 @@ use gtk4::{Application, ApplicationWindow};
 use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 use tracing::{debug, info};
 
+#[allow(dead_code)]
 const APP_ID: &str = "com.github.native-launcher";
 
 /// Main application window
@@ -51,12 +52,16 @@ impl LauncherWindow {
     }
 
     /// Hide the window
+    #[allow(dead_code)]
+
     pub fn hide(&self) {
         debug!("Hiding window");
         self.window.set_visible(false);
     }
 
     /// Toggle window visibility
+    #[allow(dead_code)]
+
     pub fn toggle(&self) {
         if self.window.is_visible() {
             self.hide();

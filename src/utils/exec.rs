@@ -9,16 +9,18 @@ pub fn execute_command(exec: &str, terminal: bool) -> Result<()> {
     // Clean up the exec string (remove field codes)
     let cleaned_exec = clean_exec_string(exec);
 
+    debug!("Cleaned command: {}", cleaned_exec);
+
     if cleaned_exec.is_empty() {
         warn!("Empty command after cleaning, skipping execution");
         return Ok(());
     }
 
     if terminal {
-        execute_in_terminal(&cleaned_exec)
-    } else {
-        execute_direct(&cleaned_exec)
+        return execute_in_terminal(&cleaned_exec);
     }
+
+    return execute_direct(&cleaned_exec);
 }
 
 /// Remove desktop entry field codes from exec string
@@ -46,6 +48,7 @@ fn clean_exec_string(exec: &str) -> String {
     if result.starts_with('"') && result.ends_with('"') && result.len() > 1 {
         result = result[1..result.len() - 1].to_string();
     }
+
     if result.starts_with('\'') && result.ends_with('\'') && result.len() > 1 {
         result = result[1..result.len() - 1].to_string();
     }

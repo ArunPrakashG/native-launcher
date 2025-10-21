@@ -1,8 +1,8 @@
-/* Native Launcher - Modern Dark Theme */
+/* Native Launcher - Native Launcher Design Language */
 
-/* === Color Palette === */
+/* === Native Launcher Color Palette === */
 :root {
-  /* Primary Colors - Coral Accent */
+  /* Primary Colors - Native Launcher Purple/Magenta */
   --nl-primary: #ff6363;
   --nl-primary-hover: #ff7a7a;
   --nl-primary-active: #ff4d4d;
@@ -27,7 +27,7 @@
   --nl-shadow-strong: rgba(0, 0, 0, 0.5);
 }
 
-/* === Main Window === */
+/* === Main Window - Native Launcher Container === */
 window {
   background-color: var(--nl-bg-primary);
   border-radius: 16px;
@@ -37,7 +37,7 @@ window {
   padding: 0;
 }
 
-/* === Search Entry === */
+/* === Search Entry - Native Launcher Search Bar === */
 entry {
   font-size: 20px;
   font-weight: 400;
@@ -82,7 +82,7 @@ listbox {
   border-top: 1px solid var(--nl-border);
 }
 
-/* === List Rows - Result Items === */
+/* === List Rows - Native Launcher Result Items === */
 listbox row {
   padding: 12px 16px;
   margin: 0;
@@ -113,20 +113,7 @@ listbox row:selected:hover {
   border-radius: 8px;
 }
 
-/* Workspace icons (greyed out to differentiate from main apps) */
-.workspace-icon {
-  opacity: 0.6;
-  filter: grayscale(0.3);
-  transition: opacity 0.15s ease, filter 0.15s ease;
-}
-
-listbox row:hover .workspace-icon,
-listbox row:selected .workspace-icon {
-  opacity: 0.85;
-  filter: grayscale(0.1);
-}
-
-/* === Labels - Typography === */
+/* === Labels - Native Launcher Typography === */
 label {
   color: var(--nl-text-primary);
   font-weight: 500;
@@ -256,7 +243,11 @@ listbox row:hover box[margin-start="24"] {
 
 /* Subtle background gradient for window */
 window {
-  background: linear-gradient(180deg, var(--nl-bg-primary) 0%, #18181a 100%);
+  background: linear-gradient(
+    180deg,
+    var(--nl-bg-primary) 0%,
+    #18181a 100%
+  );
 }
 
 /* === Keyboard Hints === */
@@ -276,130 +267,4 @@ window {
 .hint-text.key-pressed {
   color: var(--nl-primary);
   transform: scale(1.05);
-}
-
-/* === Animations === */
-
-/* Fade in animation for new results */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Fade out animation for removed results */
-@keyframes fadeOut {
-  from {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  to {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-}
-
-/* Slide in from top for window appearance */
-@keyframes slideInFromTop {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Smooth opacity transition on hover (removed animation as GTK reuses rows) */
-listbox row {
-  opacity: 0.95;
-  transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1),
-    background-color 0.15s cubic-bezier(0.4, 0, 0.2, 1),
-    transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-listbox row:hover,
-listbox row:selected {
-  opacity: 1;
-}
-
-/* Apply subtle scale on selection for visual feedback */
-listbox row:selected {
-  transform: scale(1.001);
-}
-
-/* Window appearance animation */
-window {
-  animation: slideInFromTop 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Smooth transition for all interactive elements */
-* {
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* === Loading/Search Progress Indicator === */
-.search-progress {
-  height: 2px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    var(--nl-primary),
-    transparent
-  );
-  animation: shimmer 1.5s infinite;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-.search-progress.active {
-  opacity: 1;
-}
-
-@keyframes shimmer {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(100%);
-  }
-}
-
-/* Enhanced icon animations */
-image {
-  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-listbox row:hover image,
-listbox row:selected image {
-  transform: scale(1.05);
-}
-
-/* === Search Footer === */
-.search-footer {
-  background-color: var(--nl-bg-secondary);
-  border-top: 1px solid var(--nl-border);
-  padding: 10px 20px;
-  margin: 0 12px 12px 12px;
-  border-radius: 10px;
-  min-height: 40px;
-  opacity: 0;
-  transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.search-footer:visible {
-  opacity: 1;
-}
-
-.search-footer-text {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--nl-text-secondary);
-  letter-spacing: 0.2px;
 }
