@@ -293,25 +293,34 @@ fn build_ui(
                             info!("Recorded launch for {}", path);
                         }
 
+                        // IMPORTANT: Hide window BEFORE launching app
+                        // This ensures the new app gets focus and appears in foreground
+                        window_clone.close();
+
                         if let Err(e) = execute_command(&exec, terminal) {
                             error!("Failed to launch {}: {}", exec, e);
                         }
-                        window_clone.close();
                     }
                 }
                 KeyboardAction::OpenUrl(url) => {
                     info!("Opening URL from plugin: {}", url);
+                    
+                    // IMPORTANT: Hide window BEFORE opening URL
+                    window_clone.close();
+                    
                     if let Err(e) = execute_command(&format!("xdg-open '{}'", url), false) {
                         error!("Failed to open URL: {}", e);
                     }
-                    window_clone.close();
                 }
                 KeyboardAction::Execute { command, terminal } => {
                     info!("Executing command from plugin: {}", command);
+                    
+                    // IMPORTANT: Hide window BEFORE executing command
+                    window_clone.close();
+                    
                     if let Err(e) = execute_command(&command, terminal) {
                         error!("Failed to execute command: {}", e);
                     }
-                    window_clone.close();
                 }
                 KeyboardAction::Handled => {
                     // Plugin handled it but don't close window
@@ -373,25 +382,34 @@ fn build_ui(
                                     info!("Recorded launch for {}", path);
                                 }
 
+                                // IMPORTANT: Hide window BEFORE launching app
+                                // This ensures the new app gets focus and appears in foreground
+                                window_clone.close();
+
                                 if let Err(e) = execute_command(&exec, terminal) {
                                     error!("Failed to launch {}: {}", exec, e);
                                 }
-                                window_clone.close();
                             }
                         }
                         KeyboardAction::OpenUrl(url) => {
                             info!("Opening URL from plugin: {}", url);
+                            
+                            // IMPORTANT: Hide window BEFORE opening URL
+                            window_clone.close();
+                            
                             if let Err(e) = execute_command(&format!("xdg-open '{}'", url), false) {
                                 error!("Failed to open URL: {}", e);
                             }
-                            window_clone.close();
                         }
                         KeyboardAction::Execute { command, terminal } => {
                             info!("Executing command from plugin: {}", command);
+                            
+                            // IMPORTANT: Hide window BEFORE executing command
+                            window_clone.close();
+                            
                             if let Err(e) = execute_command(&command, terminal) {
                                 error!("Failed to execute command: {}", e);
                             }
-                            window_clone.close();
                         }
                         KeyboardAction::Handled => {
                             // Plugin handled it but don't close window
