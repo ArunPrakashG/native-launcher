@@ -86,6 +86,24 @@ impl ResultsList {
         self.render_items(items);
     }
 
+    /// Append plugin results without clearing existing items (for incremental search)
+    pub fn append_plugin_results(&self, results: Vec<PluginResult>) {
+        let new_items: Vec<ListItem> = results
+            .into_iter()
+            .map(|result| ListItem::PluginResult { result })
+            .collect();
+
+        // Add to existing items
+        let mut items = self.items.borrow_mut();
+        items.extend(new_items.clone());
+        drop(items);
+
+        // Render only the new items to the UI
+        for item in new_items {
+            self.render_single_item(item);
+        }
+    }
+
     /// Render items to the UI (common logic)
     fn render_items(&self, items: Vec<ListItem>) {
         tracing::debug!("Rendering {} items", items.len());
@@ -98,39 +116,30 @@ impl ResultsList {
         }
 
         // Create a row for each item
-        for (idx, item) in items.iter().enumerate() {
-            let content_box = match item {
-                ListItem::App { entry } => self.create_result_row(entry),
-                ListItem::Action { action, .. } => self.create_action_row(action),
-                ListItem::PluginResult { result } => self.create_plugin_result_row(result),
-            };
+        for item in items {
+            self.render_single_item(item);
+        }
 
-            // Explicitly create ListBoxRow and set the child
-            let row = gtk4::ListBoxRow::new();
-            row.set_child(Some(&content_box));
-
-            self.list.append(&row);
-
-            // Verify GTK assigned the expected index
-            let gtk_index = row.index();
-            if gtk_index != idx as i32 {
-                tracing::warn!(
-                    "GTK index mismatch! Expected {}, got {} for item: {}",
-                    idx,
-                    gtk_index,
-                    match item {
-                        ListItem::App { entry } => &entry.name,
-                        ListItem::Action { action, .. } => &action.name,
-                        ListItem::PluginResult { result } => &result.title,
-                    }
-                );
+        // Select first row if available
+        if let Some(first_row) = self.list.first_child() {
+            if let Some(row) = first_row.downcast_ref::<gtk4::ListBoxRow>() {
+                self.list.select_row(Some(row));
             }
         }
+    }
 
-        // Select first item
-        if let Some(first_row) = self.list.row_at_index(0) {
-            self.list.select_row(Some(&first_row));
-        }
+    /// Render a single item to the UI
+    fn render_single_item(&self, item: ListItem) {
+        let content_box = match &item {
+            ListItem::App { entry } => self.create_result_row(entry),
+            ListItem::Action { action, .. } => self.create_action_row(action),
+            ListItem::PluginResult { result } => self.create_plugin_result_row(result),
+        };
+
+        // Create ListBoxRow and set the child
+        let row = gtk4::ListBoxRow::new();
+        row.set_child(Some(&content_box));
+        self.list.append(&row);
     }
 
     /// Get the command to execute based on current selection

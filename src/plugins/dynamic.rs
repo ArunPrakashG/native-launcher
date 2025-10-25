@@ -28,11 +28,13 @@ pub struct PluginMetrics {
     /// Whether loading was successful
     pub success: bool,
     /// Error message if loading failed
+    #[allow(dead_code)] // Used for error reporting in UI
     pub error: Option<String>,
 }
 
 impl PluginMetrics {
     /// Check if this plugin is slow (>10ms load time)
+    #[allow(dead_code)] // Part of performance monitoring API
     pub fn is_slow(&self) -> bool {
         self.load_time.as_millis() > 10
     }
@@ -43,6 +45,7 @@ impl PluginMetrics {
     }
 
     /// Check if this plugin uses a lot of memory (>5MB)
+    #[allow(dead_code)] // Part of performance monitoring API
     pub fn is_memory_heavy(&self) -> bool {
         self.memory_bytes > 5 * 1024 * 1024
     }
@@ -122,6 +125,7 @@ pub struct CKeyboardEvent {
 
 /// C-compatible keyboard action
 #[repr(C)]
+#[allow(dead_code)] // FFI enum - all variants part of plugin API
 pub enum CKeyboardAction {
     None,
     Execute,
@@ -144,6 +148,7 @@ pub struct CKeyboardActionData {
 /// 2. Implement these functions with `#[no_mangle]` and `extern "C"`
 /// 3. Compile with `cargo build --release`
 /// 4. Copy the .so file to `~/.config/native-launcher/plugins/`
+#[allow(dead_code)] // FFI struct - all fields part of plugin API
 pub struct PluginFFI {
     /// Get ABI version (must return PLUGIN_ABI_VERSION)
     pub get_abi_version: unsafe extern "C" fn() -> u32,

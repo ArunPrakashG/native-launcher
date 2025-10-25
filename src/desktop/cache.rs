@@ -24,7 +24,6 @@ struct CachedFile {
 pub struct DesktopCache {
     /// Cache format version for compatibility
     #[allow(dead_code)]
-
     version: u32,
     /// Cached entries keyed by file path
     entries: HashMap<PathBuf, CachedFile>,
@@ -181,7 +180,6 @@ impl DesktopCache {
     pub fn stats(&self) -> CacheStats {
         CacheStats {
             #[allow(dead_code)]
-
             total_entries: self.entries.len(),
             version: self.version,
         }
@@ -190,6 +188,7 @@ impl DesktopCache {
 
 /// Cache statistics
 #[derive(Debug)]
+#[allow(dead_code)] // Stats struct for debugging - all fields part of API
 pub struct CacheStats {
     pub total_entries: usize,
     pub version: u32,

@@ -1,0 +1,24 @@
+# Weather Plugin for Native Launcher
+# Fetches weather information using wttr.in
+
+[metadata]
+name = "Weather"
+description = "Get weather forecasts for any location"
+author = "Native Launcher Team"
+version = "1.0.0"
+priority = 600
+icon = "weather-clear"
+
+# Command triggers - user can type "weather" or "w"
+triggers = ["weather ", "w "]
+
+[execution]
+script = "weather.sh"
+interpreter = "bash"
+output_format = "json"
+timeout_ms = 5000
+show_on_empty = false
+
+[environment]
+# API settings
+WTTR_FORMAT = "%l:+%C+%t+%h+%w"

@@ -31,16 +31,19 @@ impl KeyboardEvent {
     }
 
     /// Check if Shift modifier is pressed
+    #[allow(dead_code)] // Part of public API for plugins
     pub fn has_shift(&self) -> bool {
         self.modifiers.contains(ModifierType::SHIFT_MASK)
     }
 
     /// Check if Alt modifier is pressed
+    #[allow(dead_code)] // Part of public API for plugins
     pub fn has_alt(&self) -> bool {
         self.modifiers.contains(ModifierType::ALT_MASK)
     }
 
     /// Check if Super/Meta modifier is pressed
+    #[allow(dead_code)] // Part of public API for plugins
     pub fn has_super(&self) -> bool {
         self.modifiers.contains(ModifierType::SUPER_MASK)
             || self.modifiers.contains(ModifierType::META_MASK)
@@ -49,6 +52,7 @@ impl KeyboardEvent {
 
 /// Action that a plugin can take in response to a keyboard event
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // All variants are part of public API - some used by web search plugin
 pub enum KeyboardAction {
     /// Plugin didn't handle this event, pass to next plugin
     None,
@@ -158,15 +162,23 @@ pub struct PluginContext {
     pub max_results: usize,
     /// Whether to include low-score results
     pub include_low_scores: bool,
+    /// Number of high-quality app results found so far (for smart triggering)
+    pub app_results_count: usize,
 }
 
 impl PluginContext {
     pub fn new(max_results: usize) -> Self {
         Self {
             max_results,
-            #[allow(dead_code)]
             include_low_scores: false,
+            app_results_count: 0,
         }
+    }
+
+    /// Create context with app results count
+    pub fn with_app_results(mut self, count: usize) -> Self {
+        self.app_results_count = count;
+        self
     }
 }
 

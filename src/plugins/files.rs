@@ -1,3 +1,4 @@
+use super::file_index::FileIndexService;
 use super::traits::{Plugin, PluginContext, PluginResult};
 use anyhow::{Context, Result};
 use std::fs;
@@ -26,6 +27,8 @@ pub struct FileBrowserPlugin {
     enabled: bool,
     #[allow(dead_code)]
     max_recent: usize,
+    /// System-wide file index service
+    file_index: FileIndexService,
 }
 
 impl FileBrowserPlugin {
@@ -36,15 +39,19 @@ impl FileBrowserPlugin {
             Vec::new()
         });
 
+        let file_index = FileIndexService::new();
+
         debug!(
-            "File browser plugin initialized with {} recent files",
-            recent_files.len()
+            "File browser plugin initialized with {} recent files, index backend: {}",
+            recent_files.len(),
+            file_index.backend_info()
         );
 
         Self {
             recent_files,
             enabled,
             max_recent: 20,
+            file_index,
         }
     }
 
@@ -406,6 +413,101 @@ impl Plugin for FileBrowserPlugin {
                         {
                             results.extend(dir_results);
                         }
+                    }
+                }
+            }
+        }
+
+        // SYSTEM-WIDE FILE SEARCH (for queries >= 3 chars, not paths)
+        // This uses locate/find to search the entire filesystem
+        //
+        // SMART TRIGGERING: Skip file search if there are already good app matches
+        // This prevents unnecessary 50-500ms file index searches when user is clearly
+        // searching for an application (e.g., "firefox", "chrome")
+        let has_good_app_matches = context.app_results_count >= 2;
+        let should_skip_file_search = has_good_app_matches && !is_file_command;
+
+        if !is_path_query && query.len() >= 3 && search_files && !should_skip_file_search {
+            let search_term = if is_file_command {
+                query_lower
+                    .strip_prefix("@recent")
+                    .or_else(|| query_lower.strip_prefix("@file"))
+                    .unwrap_or(&query_lower)
+                    .trim()
+            } else {
+                query_lower.trim()
+            };
+
+            // Only perform system search if term is meaningful (>= 3 chars)
+            if search_term.len() >= 3 {
+                debug!("Performing system-wide file search for: {}", search_term);
+
+                match self.file_index.search(search_term) {
+                    Ok(indexed_files) => {
+                        debug!("Found {} files in system index", indexed_files.len());
+
+                        for path in indexed_files.iter().take(20) {
+                            // Skip if already in results (from recent files)
+                            if results
+                                .iter()
+                                .any(|r| r.command.contains(&path.to_string_lossy().to_string()))
+                            {
+                                continue;
+                            }
+
+                            let file_name = path
+                                .file_name()
+                                .and_then(|n| n.to_str())
+                                .unwrap_or("Unknown")
+                                .to_string();
+
+                            let icon = Self::get_file_icon(path);
+
+                            // Build subtitle with path and size
+                            let mut subtitle_parts = Vec::new();
+                            if let Some(parent) = path.parent() {
+                                subtitle_parts.push(parent.to_string_lossy().to_string());
+                            }
+                            if let Ok(metadata) = fs::metadata(path) {
+                                subtitle_parts.push(Self::format_size(metadata.len()));
+                            }
+                            let subtitle = if subtitle_parts.is_empty() {
+                                None
+                            } else {
+                                Some(subtitle_parts.join(" • "))
+                            };
+
+                            // Score indexed files slightly lower than recent files
+                            // but use relevance-based scoring from the index
+                            let base_score = 650;
+                            let file_name_lower = file_name.to_lowercase();
+                            let score = if file_name_lower == search_term {
+                                base_score + 100 // Exact match
+                            } else if file_name_lower.starts_with(search_term) {
+                                base_score + 50 // Prefix match
+                            } else {
+                                base_score // Contains match
+                            };
+
+                            results.push(PluginResult {
+                                title: file_name,
+                                subtitle,
+                                icon: Some(icon),
+                                command: format!("xdg-open '{}'", path.display()),
+                                terminal: false,
+                                score,
+                                plugin_name: self.name().to_string(),
+                                sub_results: Vec::new(),
+                                parent_app: None,
+                            });
+
+                            if results.len() >= context.max_results {
+                                break;
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        debug!("System file search failed: {}", e);
                     }
                 }
             }

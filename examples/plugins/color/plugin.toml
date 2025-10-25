@@ -1,0 +1,19 @@
+# Color Picker Plugin for Native Launcher
+# Convert between color formats and preview colors
+
+[metadata]
+name = "Color Picker"
+description = "Convert colors between hex, RGB, HSL formats"
+author = "Native Launcher Team"
+version = "1.0.0"
+priority = 500
+icon = "color-select"
+
+triggers = ["color ", "col ", "#"]
+
+[execution]
+script = "color.py"
+interpreter = "python3"
+output_format = "json"
+timeout_ms = 500
+show_on_empty = false

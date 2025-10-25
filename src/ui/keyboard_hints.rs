@@ -43,7 +43,6 @@ impl KeyboardHints {
 
     #[allow(dead_code)]
 
-
     fn get_action_mode_hints() -> String {
         String::from(
             "<span size='small' alpha='60%'>\
@@ -70,7 +69,7 @@ impl KeyboardHints {
     /// Show visual feedback when a key is pressed
     #[allow(dead_code)]
 
-    pub fn flash_key(&self, key_name: &str) {
+    pub fn flash_key(&self, _key_name: &str) {
         // Add a CSS class temporarily to highlight the pressed key
         self.hint_label.add_css_class("key-pressed");
 

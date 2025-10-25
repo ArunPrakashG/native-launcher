@@ -73,6 +73,8 @@ pub struct UIConfig {
     pub animation_duration: u32,
     /// Theme: "dark" or "light" (currently only dark is supported)
     pub theme: String,
+    /// Show empty state on launch (Spotlight-style) - hides results until user types
+    pub empty_state_on_launch: bool,
 }
 
 impl Default for UIConfig {
@@ -82,6 +84,7 @@ impl Default for UIConfig {
             show_keyboard_hints: true,
             animation_duration: 150,
             theme: "dark".to_string(),
+            empty_state_on_launch: true,
         }
     }
 }

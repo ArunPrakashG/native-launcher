@@ -1,0 +1,19 @@
+# Emoji Search Plugin for Native Launcher
+# Search and copy emojis by name or keyword
+
+[metadata]
+name = "Emoji Search"
+description = "Search and copy emojis to clipboard"
+author = "Native Launcher Team"
+version = "1.0.0"
+priority = 550
+icon = "face-smile"
+
+triggers = ["emoji ", "em ", ":"]
+
+[execution]
+script = "emoji.py"
+interpreter = "python3"
+output_format = "json"
+timeout_ms = 1000
+show_on_empty = true

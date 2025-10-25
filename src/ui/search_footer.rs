@@ -5,6 +5,7 @@ use gtk4::{prelude::*, Box as GtkBox, Label, Orientation};
 pub struct SearchFooter {
     pub container: GtkBox,
     label: Label,
+    loading_label: Label,
 }
 
 impl SearchFooter {
@@ -19,9 +20,20 @@ impl SearchFooter {
         label.set_halign(gtk4::Align::Center);
         label.set_hexpand(true);
 
-        container.append(&label);
+        let loading_label = Label::new(None);
+        loading_label.set_css_classes(&["search-footer-loading"]);
+        loading_label.set_halign(gtk4::Align::Center);
+        loading_label.set_hexpand(true);
+        loading_label.set_visible(false);
 
-        Self { container, label }
+        container.append(&label);
+        container.append(&loading_label);
+
+        Self {
+            container,
+            label,
+            loading_label,
+        }
     }
 
     /// Update footer with web search information
@@ -34,17 +46,35 @@ impl SearchFooter {
         self.label.set_markup(&markup);
     }
 
+    /// Show loading indicator
+    pub fn show_loading(&self) {
+        self.loading_label
+            .set_markup("<span foreground='#ff6363'>⏳ Searching files...</span>");
+        self.loading_label.set_visible(true);
+        self.label.set_visible(false);
+        self.container.set_visible(true);
+    }
+
+    /// Hide loading indicator
+    pub fn hide_loading(&self) {
+        self.loading_label.set_visible(false);
+        self.label.set_visible(true);
+    }
+
     /// Show the footer
     pub fn show(&self) {
+        self.hide_loading(); // Ensure loading is hidden when showing web search
         self.container.set_visible(true);
     }
 
     /// Hide the footer
     pub fn hide(&self) {
         self.container.set_visible(false);
+        self.hide_loading();
     }
 
     /// Check if footer is visible
+    #[allow(dead_code)] // Part of widget API
     pub fn is_visible(&self) -> bool {
         self.container.is_visible()
     }

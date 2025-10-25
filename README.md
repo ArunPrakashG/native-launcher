@@ -9,15 +9,18 @@ A modern, fast, and beautifully designed application launcher for Linux, written
 
 ## ✨ Features
 
-- ⚡ **Lightning Fast**: Sub-100ms startup, <10ms search latency
-- 🎨 **Modern Design**: Clean, minimal UI with coral accents (#FF6363) on charcoal (#1C1C1E)
-- 🔍 **Smart Search**: Intelligent fuzzy matching with relevance scoring
+- ⚡ **Lightning Fast**: Sub-100ms startup, <10ms search latency with smart debouncing
+- 🎨 **Modern Design**: Fully rounded UI with smooth animations, coral accents (#FF6363) on charcoal (#1C1C1E)
+- 🔍 **Smart Search**: Intelligent fuzzy matching with relevance scoring and smart triggering
+- 💾 **System-Wide File Search**: Integrated file indexing using native Linux tools (plocate/fd/find)
 - 🔌 **Plugin System**: Extensible with keyboard event handling + dynamic plugin loading
+- 📜 **Script Plugins**: Create plugins in any language (Bash, Python, etc.) without compiling Rust
 - 🧮 **Advanced Calculator**: Time calculations, unit conversions, currency, timezone - with clipboard copy
 - 🌐 **Web Search**: Press `Ctrl+Enter` for instant web search
 - 📁 **Workspace Detection**: Find VS Code/VSCodium workspaces automatically
 - ⌨️ **Keyboard-Driven**: Full keyboard navigation and shortcuts
 - 🪟 **Wayland Native**: Built on gtk4-layer-shell for seamless integration
+- 🎬 **Smooth Animations**: List entry/exit animations with staggered timing for modern feel
 
 ## Quick Start
 
@@ -85,10 +88,17 @@ To reset to defaults, simply delete `~/.config/native-launcher/` and the cache f
 - `@cal <expression>` - Calculate mathematical expressions
 - `@convert`, `@time`, `@currency` - Advanced calculations (time, units, currency, timezone)
 - `@code`, `@zed`, `@editor` - Search editor workspaces
-- `@files` - Search recent files and directories
+- `@files` - Search recent files and system-wide file index
 - `@shell <cmd>` or `$ <cmd>` - Execute shell commands
 - `@ssh <host>` - Connect to SSH hosts
 - `@web <query>` - Web search
+
+**Performance Features**:
+
+- 🚀 **150ms debouncing** - Prevents lag during rapid typing
+- 🧠 **Smart triggering** - Skips expensive file searches when apps match
+- ⚡ **Async file search** - Background indexing ready (future use)
+- 📊 **Two-pass search** - Applications first, then other plugins with context
 
 **Full usage guide**: See [Wiki: Quick Start](https://github.com/ArunPrakashG/native-launcher/wiki/Quick-Start)
 
@@ -139,10 +149,13 @@ See [DYNAMIC_PLUGINS.md](DYNAMIC_PLUGINS.md) for the complete guide on creating 
 
 Every feature prioritizes speed:
 
-- **<100ms cold start**: Optimized startup sequence
-- **<10ms search**: Fast fuzzy matching with caching
+- **<100ms cold start**: Optimized startup sequence with async loading
+- **<10ms search**: Fast fuzzy matching with caching and smart triggering
 - **<30MB memory**: Minimal resource footprint
 - **Background loading**: Icon cache preloads without blocking UI
+- **Smart debouncing**: 150ms delay prevents input lag during rapid typing
+- **Two-pass search**: Apps searched first, expensive operations only when needed
+- **File index integration**: Native Linux tools (plocate → mlocate → locate → fd → find) for system-wide search
 
 See [Wiki: Performance](https://github.com/ArunPrakashG/native-launcher/wiki/Performance) for benchmarks.
 
@@ -181,6 +194,79 @@ Natural language calculations beyond basic math:
 - 💡 Smart natural language parsing
 
 See [docs/ADVANCED_CALCULATOR.md](docs/ADVANCED_CALCULATOR.md) for complete guide and examples.
+
+### Script Plugin System
+
+**Extend the launcher with any programming language** - no Rust compilation needed!
+
+Create custom plugins using Bash, Python, Node.js, or any executable:
+
+**Quick Example:**
+
+```bash
+# Create plugin directory
+mkdir -p ~/.config/native-launcher/plugins/hello-world
+
+# Write manifest (plugin.toml)
+cat > ~/.config/native-launcher/plugins/hello-world/plugin.toml <<EOF
+[metadata]
+name = "Hello World"
+description = "My first plugin"
+author = "Your Name"
+version = "1.0.0"
+priority = 600
+
+triggers = ["hello ", "hi "]
+
+[execution]
+script = "hello.sh"
+interpreter = "bash"
+output_format = "json"
+timeout_ms = 1000
+EOF
+
+# Write script
+cat > ~/.config/native-launcher/plugins/hello-world/hello.sh <<'EOF'
+#!/usr/bin/env bash
+cat <<JSON
+{
+  "results": [
+    {
+      "title": "Hello, $1!",
+      "subtitle": "Press Enter to copy",
+      "command": "echo 'Hello, $1!' | wl-copy"
+    }
+  ]
+}
+JSON
+EOF
+
+chmod +x ~/.config/native-launcher/plugins/hello-world/hello.sh
+```
+
+**Built-in Example Plugins:**
+
+- 🌤️ **Weather** - Get weather forecasts (`weather Tokyo` or `w London`)
+- 😀 **Emoji Search** - Search 200+ emojis (`emoji smile` or `:fire`)
+- 🎨 **Color Picker** - Convert colors (`color #FF5733` or `col rgb(255,87,51)`)
+
+**Features:**
+
+- 📝 TOML-based manifests (metadata, triggers, execution config)
+- 🔄 JSON and text output formats
+- 🔌 Auto-discovery from multiple directories
+- ⚙️ Environment variable injection
+- ⏱️ Configurable timeouts
+- 🎯 Priority-based ordering
+- 📋 Clipboard integration built-in
+
+**Get Started:**
+
+- **[Plugin Development Guide](docs/PLUGIN_DEVELOPMENT.md)** - Complete reference (600+ lines)
+- **[Example Plugins](examples/plugins/)** - Weather, emoji, color picker
+- **[Wiki: Script Plugins](https://github.com/ArunPrakashG/native-launcher/wiki/Script-Plugins)** - User guide
+
+**Plugin Ideas**: Dictionary, translation, cryptocurrency prices, password generator, QR codes, system info, process manager, clipboard history, and more!
 
 ## Development
 

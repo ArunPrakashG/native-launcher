@@ -20,7 +20,7 @@ pub fn execute_command(exec: &str, terminal: bool) -> Result<()> {
         return execute_in_terminal(&cleaned_exec);
     }
 
-    return execute_direct(&cleaned_exec);
+    execute_direct(&cleaned_exec)
 }
 
 /// Remove desktop entry field codes from exec string
