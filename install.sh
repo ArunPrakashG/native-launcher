@@ -615,9 +615,27 @@ get_compositor_config_path() {
     esac
 }
 
+# Detect session manager (uwsm, etc.)
+detect_session_manager() {
+    if command -v uwsm >/dev/null 2>&1; then
+        echo "uwsm"
+    else
+        echo ""
+    fi
+}
+
 # Get auto-start command format for compositor
 get_autostart_command() {
-    local binary="$INSTALL_DIR/native-launcher"
+    local binary="native-launcher"  # Use binary name from PATH, not absolute path
+    local use_session_mgr="$1"
+    
+    # Wrap with session manager if requested
+    if [ "$use_session_mgr" = "yes" ]; then
+        local session_mgr=$(detect_session_manager)
+        if [ "$session_mgr" = "uwsm" ]; then
+            binary="uwsm app -- $binary"
+        fi
+    fi
     
     case "$COMPOSITOR" in
         hyprland)
@@ -698,7 +716,7 @@ setup_compositor_autostart() {
     if [ -z "$detected_config" ]; then
         log_warning "Compositor auto-start not supported for $COMPOSITOR"
         log_info "To enable daemon mode, add to your compositor config:"
-        echo "  $INSTALL_DIR/native-launcher --daemon"
+        echo "  native-launcher --daemon"
         return
     fi
     
@@ -738,7 +756,7 @@ setup_compositor_autostart() {
         if [ -z "$config_file" ]; then
             log_info "Skipping daemon auto-start setup"
             log_info "To enable manually, add to your compositor config:"
-            echo "  $INSTALL_DIR/native-launcher --daemon"
+            echo "  native-launcher --daemon"
             return
         fi
         
@@ -750,14 +768,45 @@ setup_compositor_autostart() {
         fi
     fi
     
-    # Check if already configured (upgrade mode)
-    if [ "$INSTALL_MODE" = "upgrade" ] && grep -q "native-launcher.*--daemon" "$config_file" 2>/dev/null; then
-        log_info "Daemon auto-start already configured in: $config_file"
-        return
+    # Check if already configured
+    local existing_entry=$(grep -n "native-launcher.*--daemon" "$config_file" 2>/dev/null | head -1)
+    local update_mode=false
+    
+    if [ -n "$existing_entry" ]; then
+        log_info "Found existing daemon entry in config"
+        echo "  Line: $existing_entry"
+        echo ""
+        read -p "Update existing entry? (Y/n) " -n 1 -r < /dev/tty
+        echo
+        
+        if [[ $REPLY =~ ^[Nn]$ ]]; then
+            log_info "Keeping existing daemon configuration"
+            return
+        fi
+        
+        update_mode=true
+    fi
+    
+    # Detect session manager
+    local session_mgr=$(detect_session_manager)
+    local use_session_mgr="no"
+    
+    if [ -n "$session_mgr" ]; then
+        echo ""
+        log_info "Detected session manager: $session_mgr"
+        echo "Session managers provide better Wayland session integration."
+        echo ""
+        read -p "Use $session_mgr to launch daemon? (Y/n) " -n 1 -r < /dev/tty
+        echo
+        
+        if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+            use_session_mgr="yes"
+            log_success "Will use $session_mgr for launching"
+        fi
     fi
     
     # Get auto-start command
-    local autostart_cmd=$(get_autostart_command)
+    local autostart_cmd=$(get_autostart_command "$use_session_mgr")
     
     if [ -z "$autostart_cmd" ]; then
         return
@@ -766,8 +815,13 @@ setup_compositor_autostart() {
     echo ""
     echo "Configuration Summary:"
     echo "  Config file: $config_file"
+    if [ "$update_mode" = true ]; then
+        echo "  Mode: Update existing entry"
+    else
+        echo "  Mode: Add new entry"
+    fi
     echo ""
-    echo "This will add native-launcher daemon to auto-start:"
+    echo "Auto-start command:"
     echo "  $autostart_cmd"
     echo ""
     echo "Benefits:"
@@ -789,7 +843,11 @@ setup_compositor_autostart() {
     echo "If validation fails, backup will be auto-restored."
     echo ""
     
-    read -p "Add daemon to auto-start? (y/N) " -n 1 -r < /dev/tty
+    if [ "$update_mode" = true ]; then
+        read -p "Update daemon configuration? (Y/n) " -n 1 -r < /dev/tty
+    else
+        read -p "Add daemon to auto-start? (y/N) " -n 1 -r < /dev/tty
+    fi
     echo
     echo ""
     
@@ -806,15 +864,21 @@ setup_compositor_autostart() {
     }
     log_success "Backup created: $backup_file"
     
-    # Remove old entries (avoid duplicates)
-    log_info "Removing old daemon entries (if any)..."
-    remove_old_daemon_entries "$config_file"
-    
-    # Add auto-start command
-    log_info "Adding daemon to compositor config..."
-    echo "" >> "$config_file"
-    echo "# Native Launcher Daemon - Added by installer on $(date +%Y-%m-%d)" >> "$config_file"
-    echo "$autostart_cmd" >> "$config_file"
+    if [ "$update_mode" = true ]; then
+        # Update existing entry
+        log_info "Updating existing daemon entry..."
+        sed -i "/native-launcher.*--daemon/c\\$autostart_cmd" "$config_file"
+    else
+        # Remove old entries (avoid duplicates)
+        log_info "Removing old daemon entries (if any)..."
+        remove_old_daemon_entries "$config_file"
+        
+        # Add new entry
+        log_info "Adding daemon to compositor config..."
+        echo "" >> "$config_file"
+        echo "# Native Launcher Daemon - Added by installer on $(date +%Y-%m-%d)" >> "$config_file"
+        echo "$autostart_cmd" >> "$config_file"
+    fi
     
     # Validate config
     log_info "Validating compositor config..."
@@ -1136,10 +1200,28 @@ verify_installation() {
     # Check if directory is in PATH
     if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
         log_warning "$INSTALL_DIR is not in your PATH"
-        log_info "Add the following to your ~/.bashrc or ~/.zshrc:"
-        echo ""
-        echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
-        echo ""
+        log_info "Adding $INSTALL_DIR to PATH in shell config..."
+        
+        # Detect shell config file
+        if [ -n "$ZSH_VERSION" ] || [ -f "$HOME/.zshrc" ]; then
+            SHELL_RC="$HOME/.zshrc"
+        elif [ -n "$BASH_VERSION" ] || [ -f "$HOME/.bashrc" ]; then
+            SHELL_RC="$HOME/.bashrc"
+        else
+            SHELL_RC="$HOME/.profile"
+        fi
+        
+        # Add to PATH if not already there
+        if ! grep -q "export PATH=\"\$HOME/.local/bin:\$PATH\"" "$SHELL_RC" 2>/dev/null; then
+            echo "" >> "$SHELL_RC"
+            echo "# Added by native-launcher installer" >> "$SHELL_RC"
+            echo "export PATH=\"\$HOME/.local/bin:\$PATH\"" >> "$SHELL_RC"
+            log_success "Added to PATH in $SHELL_RC"
+            log_info "Run: source $SHELL_RC (or restart your terminal)"
+        fi
+        
+        # Add to current session
+        export PATH="$HOME/.local/bin:$PATH"
     fi
     
     log_success "Installation verified successfully!"

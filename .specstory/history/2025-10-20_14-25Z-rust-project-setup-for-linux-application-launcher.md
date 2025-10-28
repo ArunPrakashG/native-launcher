@@ -11827,9 +11827,103 @@ The release workflow will now complete successfully with just the main GNU libc 
 
 ---
 
-_**User (2025-10-28 14:56Z)**_
+_**User (2025-10-28 14:59Z)**_
 
 on first input prompt, it just stops running. it is not waiting for user input.
+
+---
+
+_**Assistant (copilot/claude-sonnet-4.5)**_
+
+Let me check the install script to see which input prompt is failing: Let me check the beginning of the script to see what the first prompt is: The issue is likely that when the script is piped from curl (like `curl ... | bash`), stdin is connected to the curl output, not the terminal. Let me check how the script detects if it's running interactively: The issue is that when you run `curl ... | bash`, stdin is consumed by curl's output. We need to redirect stdin from the terminal. Let me fix the `read` commands to explicitly use `tty`: 
+```
+
+```
+
+```
+
+```
+
+```
+
+```
+
+```
+
+```
+
+```
+
+```
+
+```
+
+```
+
+```
+
+```
+
+```
+
+```
+
+```
+
+```
+
+```
+
+```
+Perfect! Now let's verify the syntax: Perfect! I've fixed all the interactive prompts in the install script. 
+
+## ✅ What Was Fixed
+
+The problem was that when running the installer via `curl ... | bash`, stdin is connected to curl's output stream, not the terminal. This causes all `read` commands to immediately fail/skip.
+
+**Solution**: Redirect all `read` commands to explicitly use `tty` (the terminal device):
+
+### Changed (10 prompts fixed):
+
+1. ✅ **Backup confirmation**: `read ... < /dev/tty`
+2. ✅ **Install mode selection**: `read ... < /dev/tty`
+3. ✅ **Fresh install confirmation**: `read ... < /dev/tty`
+4. ✅ **Stop daemon prompt**: `read ... < /dev/tty`
+5. ✅ **Config file confirmation**: `read ... < /dev/tty`
+6. ✅ **Custom config path input**: `read ... < /dev/tty`
+7. ✅ **Config path (if not found)**: `read ... < /dev/tty`
+8. ✅ **Daemon auto-start prompt**: `read ... < /dev/tty`
+9. ✅ **Theme selection**: `read ... < /dev/tty`
+10. ✅ **Config overwrite prompt**: `read ... < /dev/tty`
+
+### How It Works
+
+```bash
+# Before (fails with curl pipe):
+read -p "Choose option: " choice
+
+# After (works with curl pipe):
+read -p "Choose option: " choice < /dev/tty
+```
+
+The `< /dev/tty` explicitly redirects stdin to the controlling terminal, bypassing the pipe from curl.
+
+Now the installer will work correctly both when:
+- Run directly: `install.sh`
+- Piped from curl: `curl -fsSL https://... | bash`
+
+The prompts will now wait for user input as expected! 🎉
+
+---
+
+_**User (2025-10-28 15:09Z)**_
+
+the app is not avialable in path i think. can you fix it?
+use the binary available on path for auto start configuration instad of absolute path. it is cleaner.
+
+Also detect if user has session managers like uwsm installed. if yes, ask if we need to launch via uwsm or similar in prompt and do the ncessary steps for that as well.
+
+also detect if we already have native launcher in auto start configuration, if yes, only update it, dont add a new entry.
 
 ---
 
