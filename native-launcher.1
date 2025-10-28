@@ -1,0 +1,367 @@
+.TH NATIVE-LAUNCHER 1 "October 2025" "Native Launcher 0.2.0" "User Commands"
+.SH NAME
+native-launcher \- Wayland-native GTK4 application launcher
+.SH SYNOPSIS
+.B native-launcher
+[\fIOPTIONS\fR]
+.SH DESCRIPTION
+.B native-launcher
+is a fast, keyboard-driven application launcher for Wayland compositors built with GTK4.
+It provides fuzzy search, plugin system, desktop actions support, and modern UI with sub-100ms startup time.
+
+Native Launcher integrates seamlessly with Wayland compositors like Hyprland, Sway, River, and KDE Plasma,
+offering features similar to macOS Spotlight or Windows PowerToys Run.
+.SH OPTIONS
+.TP
+.BR \-\-daemon
+Run in daemon mode. Pre-loads the launcher in the background for instant appearance when triggered.
+Uses ~20-30MB RAM but provides <10ms response time.
+.TP
+.BR \-\-config " " \fIPATH\fR
+Use custom configuration file instead of default (~/.config/native-launcher/config.toml).
+.TP
+.BR \-\-version
+Display version information and exit.
+.TP
+.BR \-h ", " \-\-help
+Display help message and exit.
+.SH CONFIGURATION
+Configuration file location: \fB~/.config/native-launcher/config.toml\fR
+
+The configuration file supports:
+.TP
+.B [ui]
+Window appearance, theme, dimensions, animations
+.TP
+.B [search]
+Search behavior, fuzzy matching, result limits
+.TP
+.B [plugins]
+Enable/disable plugins, configure plugin-specific settings
+.TP
+.B [keybindings]
+Keyboard shortcuts for navigation and actions
+
+.SH THEMES
+Native Launcher includes 6 built-in themes:
+.TP
+.B default
+Coral/red accent (#FF6363) on dark charcoal (#1C1C1E)
+.TP
+.B nord
+Frost blue accent (#88C0D0) on polar night (#2E3440)
+.TP
+.B dracula
+Purple accent (#BD93F9) on dark (#282A36)
+.TP
+.B catppuccin
+Lavender accent (#B4BEFE) on mocha (#1E1E2E)
+.TP
+.B gruvbox
+Orange accent (#FE8019) on dark (#282828)
+.TP
+.B tokyo-night
+Electric blue accent (#7AA2F7) on night (#1A1B26)
+
+.SH PLUGINS
+.TP
+.B Applications
+Search and launch installed applications via .desktop files. Supports desktop actions (e.g., "Firefox Private Window").
+.TP
+.B Calculator
+Advanced calculator with math expressions, unit conversions, currency, and timezone conversions.
+Examples: "2+2", "100 USD to EUR", "5 miles to km", "now in Tokyo"
+.TP
+.B Files
+Search files using plocate, fd, or find. Configurable search paths and file type filters.
+.TP
+.B Web Search
+Quick web searches with custom search engines. Default: DuckDuckGo, Google, Wikipedia, GitHub, etc.
+.TP
+.B SSH
+Quick SSH connection launcher. Reads from ~/.ssh/config.
+.TP
+.B System
+System commands like shutdown, reboot, logout, lock, sleep.
+.TP
+.B Clipboard
+Clipboard history manager (requires clipboard manager backend).
+
+.SH KEYBINDINGS
+.SS Default Keybindings
+.TP
+.B Escape
+Close launcher
+.TP
+.B Up/Down Arrows
+Navigate results
+.TP
+.B Enter
+Execute selected item
+.TP
+.B Ctrl+Enter
+Execute action without closing launcher
+.TP
+.B Tab
+Cycle through desktop actions (if available)
+.TP
+.B Ctrl+C
+Copy selected result to clipboard
+.TP
+.B Ctrl+,
+Open configuration file
+
+.SH DAEMON MODE
+Daemon mode pre-loads the launcher on compositor startup for instant response:
+
+.B Benefits:
+.RS
+- <10ms response time (vs ~100ms cold start)
+.br
+- Instant window appearance
+.br
+- No visible startup delay
+.RE
+
+.B Setup via compositor config:
+.RS
+.B Hyprland:
+exec-once = native-launcher --daemon
+
+.B Sway:
+exec native-launcher --daemon
+
+.B i3:
+exec --no-startup-id native-launcher --daemon
+
+.B River:
+riverctl spawn "native-launcher --daemon"
+.RE
+
+.B Manage daemon:
+.RS
+Check status:
+.br
+.I pgrep -f "native-launcher.*--daemon"
+
+Stop daemon:
+.br
+.I pkill -f "native-launcher.*--daemon"
+.RE
+
+.SH SESSION MANAGERS
+Native Launcher supports Wayland session managers for better integration:
+
+.B UWSM (Universal Wayland Session Manager):
+.RS
+Launch via uwsm:
+.br
+.I exec-once = uwsm app -- native-launcher --daemon
+
+Benefits: Proper environment variables, session tracking, systemd integration
+.RE
+
+.SH FILES
+.TP
+.I ~/.config/native-launcher/config.toml
+Main configuration file
+.TP
+.I ~/.config/native-launcher/plugins/
+Plugin configurations and custom plugins
+.TP
+.I ~/.cache/native-launcher/
+Search cache and temporary data
+.TP
+.I ~/.local/share/native-launcher/
+Usage data, history, and application state
+.TP
+.I ~/.local/share/applications/
+System .desktop files for application search
+.TP
+.I ~/.local/share/applications/*.desktop
+User-specific .desktop files
+
+.SH ENVIRONMENT
+.TP
+.B XDG_CONFIG_HOME
+Overrides default config directory (~/.config)
+.TP
+.B XDG_CACHE_HOME
+Overrides default cache directory (~/.cache)
+.TP
+.B XDG_DATA_HOME
+Overrides default data directory (~/.local/share)
+.TP
+.B WAYLAND_DISPLAY
+Required for Wayland support
+.TP
+.B RUST_LOG
+Set logging level (debug, info, warn, error). Example: RUST_LOG=debug native-launcher
+
+.SH PERFORMANCE
+.TP
+.B Startup Time
+<100ms cold start, <10ms with daemon mode
+.TP
+.B Search Latency
+<10ms for 500 applications (target: <5ms)
+.TP
+.B Memory Usage
+<30MB idle, ~20-30MB additional in daemon mode
+.TP
+.B Search Debounce
+150ms default (configurable)
+
+.SH COMPOSITOR INTEGRATION
+Native Launcher requires a Wayland compositor with layer-shell protocol support:
+
+.B Supported:
+.RS
+- Hyprland (wlroots)
+.br
+- Sway (wlroots)
+.br
+- River (wlroots)
+.br
+- KDE Plasma (Wayland)
+.br
+- GNOME (Mutter)
+.br
+- Wayfire
+.RE
+
+.B Setup Keybind:
+.RS
+Most compositors require manual keybind configuration. The installer can automatically
+add keybinds for Hyprland and Sway. For others, add to your compositor config:
+
+.I Command: native-launcher
+.br
+.I Keybind: Super+Space (recommended)
+.RE
+
+.SH EXAMPLES
+.TP
+.B Launch normally
+native-launcher
+.TP
+.B Run in daemon mode
+native-launcher --daemon
+.TP
+.B Use custom config
+native-launcher --config ~/my-config.toml
+.TP
+.B Debug mode
+RUST_LOG=debug native-launcher
+
+.SH SEARCH EXAMPLES
+.TP
+.B Application search
+"firefox" - Launch Firefox
+.br
+"firefox private" - Open private window (desktop action)
+.TP
+.B Calculator
+"2+2*3" - Math expression
+.br
+"100 USD to EUR" - Currency conversion
+.br
+"5 miles to km" - Unit conversion
+.br
+"now in Tokyo" - Timezone conversion
+.TP
+.B File search
+"report.pdf" - Find files matching name
+.br
+"*.rs" - Find all Rust files
+.TP
+.B Web search
+"!g wayland" - Google search
+.br
+"!w Rust" - Wikipedia search
+.br
+"!gh native-launcher" - GitHub search
+.TP
+.B SSH
+"ssh prod" - Connect to production server
+.br
+"ssh dev" - Connect to development server
+
+.SH TROUBLESHOOTING
+.TP
+.B Launcher doesn't appear
+- Check if compositor supports layer-shell protocol
+.br
+- Verify keybind is configured correctly
+.br
+- Check logs: journalctl --user -eu native-launcher
+.TP
+.B No applications found
+- Ensure .desktop files exist in /usr/share/applications and ~/.local/share/applications
+.br
+- Check permissions on .desktop files
+.br
+- Clear cache: rm -rf ~/.cache/native-launcher
+.TP
+.B Daemon not starting
+- Check if already running: pgrep -f "native-launcher.*--daemon"
+.br
+- Check compositor config syntax
+.br
+- Verify binary is in PATH: which native-launcher
+.TP
+.B High memory usage
+- Disable daemon mode
+.br
+- Reduce search result limits in config
+.br
+- Disable unused plugins
+
+.SH PERFORMANCE TUNING
+Edit \fB~/.config/native-launcher/config.toml\fR:
+
+.B Reduce startup time:
+.RS
+[plugins]
+.br
+enabled = ["apps", "calc"]  # Enable only needed plugins
+.RE
+
+.B Improve search performance:
+.RS
+[search]
+.br
+max_results = 20  # Reduce result count
+.br
+debounce_ms = 100  # Faster response
+.RE
+
+.B Lower memory usage:
+.RS
+[search]
+.br
+cache_enabled = false  # Disable search cache
+.RE
+
+.SH BUGS
+Report bugs at: https://github.com/ArunPrakashG/native-launcher/issues
+
+.SH AUTHOR
+Written by Arun Prakash G.
+
+.SH COPYRIGHT
+Copyright © 2025 Arun Prakash G. License: MIT
+.br
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+
+.SH SEE ALSO
+.BR hyprland (1),
+.BR sway (1),
+.BR waybar (1),
+.BR rofi (1),
+.BR wofi (1)
+
+Full documentation: https://github.com/ArunPrakashG/native-launcher/wiki
+
+Project homepage: https://github.com/ArunPrakashG/native-launcher

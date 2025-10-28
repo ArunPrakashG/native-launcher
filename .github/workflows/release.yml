@@ -234,6 +234,7 @@ jobs:
           mkdir -p release
           cp target/release/native-launcher release/
           cp README.md LICENSE CONTRIBUTING.md release/
+          cp native-launcher.1 release/
           cp -r config release/
           cd release
           tar -czf ../native-launcher-${{ steps.get_tag.outputs.tag }}-linux-x86_64.tar.gz *

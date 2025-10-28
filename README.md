@@ -105,6 +105,14 @@ Choose from 6 beautiful themes during installation:
 
 ## 📚 Documentation
 
+**Man Page** - Comprehensive reference manual (installed with launcher):
+
+```bash
+man native-launcher
+```
+
+**Online Wiki** - Detailed guides and tutorials:
+
 - 📖 [Full Documentation](https://github.com/ArunPrakashG/native-launcher/wiki)
 - ⚙️ [Configuration Guide](https://github.com/ArunPrakashG/native-launcher/wiki/Configuration)
 - 🔌 [Plugin Development](https://github.com/ArunPrakashG/native-launcher/wiki/Plugin-Development)

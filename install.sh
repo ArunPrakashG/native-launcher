@@ -280,6 +280,20 @@ download_and_install() {
     cp "$BINARY" "$INSTALL_DIR/native-launcher"
     chmod +x "$INSTALL_DIR/native-launcher"
     
+    # Install man page if available
+    if [ -f "native-launcher.1" ]; then
+        log_info "Installing man page..."
+        mkdir -p "$HOME/.local/share/man/man1"
+        cp "native-launcher.1" "$HOME/.local/share/man/man1/"
+        
+        # Update man database if mandb is available
+        if command -v mandb >/dev/null 2>&1; then
+            mandb -q "$HOME/.local/share/man" 2>/dev/null || true
+        fi
+        
+        log_success "Man page installed (run: man native-launcher)"
+    fi
+    
     # Cleanup
     cd - > /dev/null
     rm -rf "$TMP_DIR"
@@ -346,6 +360,14 @@ backup_existing_installation() {
         cp "$INSTALL_DIR/native-launcher" "$backup_dir/native-launcher" 2>/dev/null && \
             log_success "Backed up binary" || \
             log_warning "Failed to backup binary"
+    fi
+    
+    # Backup man page
+    if [ -f "$HOME/.local/share/man/man1/native-launcher.1" ]; then
+        mkdir -p "$backup_dir/man" 2>/dev/null
+        cp "$HOME/.local/share/man/man1/native-launcher.1" "$backup_dir/man/" 2>/dev/null && \
+            log_success "Backed up man page" || \
+            log_warning "Failed to backup man page"
     fi
     
     # Backup configuration
@@ -624,6 +646,90 @@ detect_session_manager() {
     fi
 }
 
+# Get keybind patterns for Super+Space in different compositors
+get_keybind_patterns() {
+    case "$COMPOSITOR" in
+        hyprland)
+            # Hyprland patterns: bind = SUPER, Space, exec, ... or bind = $mainMod, Space, exec, ...
+            echo 'bind.*SUPER.*Space|bind.*\$mainMod.*Space'
+            ;;
+        sway|i3)
+            # Sway/i3 patterns: bindsym $mod+Space exec ... or bindsym Mod4+Space exec ...
+            echo 'bindsym.*\$mod.*Space|bindsym.*Mod4.*Space'
+            ;;
+        river)
+            # River patterns: riverctl map ... Super Space spawn ...
+            echo 'riverctl map.*Super Space'
+            ;;
+        wayfire)
+            # Wayfire patterns: binding_launcher = <super> KEY_SPACE
+            echo 'binding.*<super>.*KEY_SPACE|binding.*<super>.*Space'
+            ;;
+        *)
+            echo ""
+            ;;
+    esac
+}
+
+# Get recommended keybind for compositor
+get_recommended_keybind() {
+    local binary="native-launcher"
+    
+    case "$COMPOSITOR" in
+        hyprland)
+            echo "bind = SUPER, Space, exec, $binary"
+            ;;
+        sway|i3)
+            echo "bindsym \$mod+Space exec $binary"
+            ;;
+        river)
+            echo "riverctl map normal Super Space spawn $binary"
+            ;;
+        wayfire)
+            echo "binding_launcher = <super> KEY_SPACE"
+            echo "command_launcher = $binary"
+            ;;
+        *)
+            echo ""
+            ;;
+    esac
+}
+
+# Detect existing Super+Space keybinds
+detect_existing_keybinds() {
+    local config_file="$1"
+    local pattern=$(get_keybind_patterns)
+    
+    if [ -z "$pattern" ] || [ ! -f "$config_file" ]; then
+        echo ""
+        return
+    fi
+    
+    # Search for keybind patterns (use single quotes to prevent variable expansion)
+    grep -nE "${pattern}" "$config_file" 2>/dev/null || echo ""
+}
+
+# Check if keybind launches native-launcher
+is_native_launcher_keybind() {
+    local keybind_line="$1"
+    
+    if echo "$keybind_line" | grep -q "native-launcher"; then
+        return 0  # true
+    else
+        return 1  # false
+    fi
+}
+
+# Update keybind in config file
+update_keybind() {
+    local config_file="$1"
+    local line_number="$2"
+    local new_keybind="$3"
+    
+    # Use sed to replace the specific line
+    sed -i "${line_number}s/.*/${new_keybind}/" "$config_file"
+}
+
 # Get auto-start command format for compositor
 get_autostart_command() {
     local binary="native-launcher"  # Use binary name from PATH, not absolute path
@@ -701,6 +807,219 @@ validate_compositor_config() {
     # Default: assume valid if file exists
     [ -f "$config_file" ]
     return $?
+}
+
+# Setup keybinds for launcher
+setup_keybinds() {
+    if [ "$INTERACTIVE" != "true" ]; then
+        return
+    fi
+    
+    # Get compositor config path
+    local config_file=$(get_compositor_config_path)
+    
+    if [ -z "$config_file" ] || [ ! -f "$config_file" ]; then
+        log_warning "Compositor config not found, skipping keybind setup"
+        return
+    fi
+    
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "  Keybind Configuration"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    
+    # Detect existing Super+Space keybinds
+    local existing_keybinds=$(detect_existing_keybinds "$config_file")
+    
+    if [ -n "$existing_keybinds" ]; then
+        log_info "Found existing Super+Space keybind(s) in:"
+        echo "  File: $config_file"
+        echo ""
+        
+        # Parse and display keybinds
+        local line_found=false
+        while IFS=: read -r line_num line_content; do
+            line_found=true
+            echo "  Line $line_num: $line_content"
+            
+            # Check if it's already configured for native-launcher
+            if is_native_launcher_keybind "$line_content"; then
+                log_success "Already configured for native-launcher"
+                echo ""
+                echo "You can verify with:"
+                echo "  sed -n '${line_num}p' $config_file"
+                echo ""
+                return
+            fi
+        done <<< "$existing_keybinds"
+        
+        if [ "$line_found" = true ]; then
+            echo ""
+            echo "You can verify with:"
+            local first_line=$(echo "$existing_keybinds" | head -1 | cut -d: -f1)
+            echo "  sed -n '${first_line}p' $config_file"
+            echo ""
+            log_warning "⚠️  Super+Space is bound to another application"
+            echo ""
+            echo "This keybind will be updated to launch native-launcher."
+            echo "The old configuration will be backed up."
+            echo ""
+            
+            read -p "Update keybind to launch native-launcher? (y/N) " -n 1 -r < /dev/tty
+            echo
+            
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                log_info "Keybind setup skipped"
+                echo ""
+                echo "To manually configure keybind:"
+                echo "  File: $config_file"
+                echo "  Add:  $(get_recommended_keybind | head -1)"
+                return
+            fi
+            
+            # Create backup
+            local backup_file="${config_file}.backup-keybind-$(date +%Y%m%d_%H%M%S)"
+            log_info "Creating backup..."
+            cp "$config_file" "$backup_file" || {
+                log_error "Failed to create backup"
+                return 1
+            }
+            log_success "Backup created: $backup_file"
+            
+            # Update the first matching keybind
+            local first_line=$(echo "$existing_keybinds" | head -1 | cut -d: -f1)
+            local new_keybind=$(get_recommended_keybind | head -1)
+            
+            log_info "Updating keybind at line $first_line..."
+            update_keybind "$config_file" "$first_line" "$new_keybind"
+            
+            # Validate config
+            if validate_compositor_config "$config_file"; then
+                log_success "Keybind updated successfully!"
+                echo ""
+                echo "Updated in: $config_file"
+                echo "Line $first_line: $new_keybind"
+                echo ""
+                echo "Verify with:"
+                echo "  sed -n '${first_line}p' $config_file"
+                echo ""
+                echo "Restart your compositor to apply changes:"
+                case "$COMPOSITOR" in
+                    hyprland)
+                        echo "  hyprctl reload"
+                        ;;
+                    sway)
+                        echo "  swaymsg reload"
+                        ;;
+                    i3)
+                        echo "  i3-msg reload"
+                        ;;
+                    river)
+                        echo "  Restart River"
+                        ;;
+                    wayfire)
+                        echo "  Restart Wayfire"
+                        ;;
+                esac
+            else
+                log_error "Config validation failed!"
+                log_warning "Restoring backup..."
+                mv "$backup_file" "$config_file"
+                log_success "Backup restored"
+                echo ""
+                echo "Manual setup required:"
+                echo "  File: $config_file"
+                echo "  Add:  $(get_recommended_keybind | head -1)"
+            fi
+        fi
+    else
+        # No existing keybind found
+        log_info "No Super+Space keybind detected in:"
+        echo "  File: $config_file"
+        echo ""
+        echo "Recommended keybind for $COMPOSITOR:"
+        local recommended=$(get_recommended_keybind)
+        echo "  $recommended"
+        echo ""
+        
+        read -p "Add this keybind to your config? (Y/n) " -n 1 -r < /dev/tty
+        echo
+        
+        if [[ $REPLY =~ ^[Nn]$ ]]; then
+            log_info "Keybind setup skipped"
+            echo ""
+            echo "To manually configure keybind:"
+            echo "  File: $config_file"
+            echo "  Add:  $(echo "$recommended" | head -1)"
+            return
+        fi
+        
+        # Create backup
+        local backup_file="${config_file}.backup-keybind-$(date +%Y%m%d_%H%M%S)"
+        log_info "Creating backup..."
+        cp "$config_file" "$backup_file" || {
+            log_error "Failed to create backup"
+            return 1
+        }
+        log_success "Backup created: $backup_file"
+        
+        # Add keybind to config
+        log_info "Adding keybind to config..."
+        echo "" >> "$config_file"
+        echo "# Native Launcher keybind" >> "$config_file"
+        
+        # Handle Wayfire's special case (needs two lines)
+        if [ "$COMPOSITOR" = "wayfire" ]; then
+            echo "binding_launcher = <super> KEY_SPACE" >> "$config_file"
+            echo "command_launcher = native-launcher" >> "$config_file"
+        else
+            echo "$recommended" >> "$config_file"
+        fi
+        
+        # Validate config
+        if validate_compositor_config "$config_file"; then
+            log_success "Keybind added successfully!"
+            echo ""
+            echo "Added to: $config_file"
+            echo "Keybind: $recommended"
+            echo ""
+            echo "Verify with:"
+            echo "  tail -n 3 $config_file"
+            echo ""
+            echo "Press Super+Space to launch Native Launcher"
+            echo ""
+            echo "Restart your compositor to apply changes:"
+            case "$COMPOSITOR" in
+                hyprland)
+                    echo "  hyprctl reload"
+                    ;;
+                sway)
+                    echo "  swaymsg reload"
+                    ;;
+                i3)
+                    echo "  i3-msg reload"
+                    ;;
+                river)
+                    echo "  Restart River"
+                    ;;
+                wayfire)
+                    echo "  Restart Wayfire"
+                    ;;
+            esac
+        else
+            log_error "Config validation failed!"
+            log_warning "Restoring backup..."
+            mv "$backup_file" "$config_file"
+            log_success "Backup restored"
+            echo ""
+            echo "Manual setup required:"
+            echo "  File: $config_file"
+            echo "  Add:  $(echo "$recommended" | head -1)"
+        fi
+    fi
+    
+    echo ""
 }
 
 # Setup compositor auto-start (replaces systemd approach)
@@ -1319,6 +1638,9 @@ main() {
     
     # Setup compositor auto-start (daemon mode)
     setup_compositor_autostart
+    
+    # Setup keybinds (Super+Space)
+    setup_keybinds
     
     # Restart daemon if it was running before
     restart_daemon
