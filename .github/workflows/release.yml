@@ -110,13 +110,11 @@ jobs:
           VERSION="${{ steps.get_version.outputs.version }}"
           PREV_TAG="${{ steps.get_prev_tag.outputs.prev_tag }}"
           DATE=$(date +%Y-%m-%d)
-          
-          # Create temporary file for new changelog entry
-          cat > new_entry.md << 'EOF'
-## [$VERSION] - $DATE
 
-EOF
-          
+          # Create temporary file for new changelog entry
+          echo "## [$VERSION] - $DATE" > new_entry.md
+          echo "" >> new_entry.md
+
           # Add features
           if git log $PREV_TAG..$TAG --pretty=format:"%s" | grep -qiE "^(feat|feature)"; then
             echo "### Added" >> new_entry.md
@@ -124,7 +122,7 @@ EOF
             git log $PREV_TAG..$TAG --pretty=format:"%s" | grep -iE "^(feat|feature)" | sed 's/^[^:]*: //' | sed 's/^/- /' >> new_entry.md
             echo "" >> new_entry.md
           fi
-          
+
           # Add bug fixes
           if git log $PREV_TAG..$TAG --pretty=format:"%s" | grep -qiE "^(fix|bugfix)"; then
             echo "### Fixed" >> new_entry.md
@@ -132,7 +130,7 @@ EOF
             git log $PREV_TAG..$TAG --pretty=format:"%s" | grep -iE "^(fix|bugfix)" | sed 's/^[^:]*: //' | sed 's/^/- /' >> new_entry.md
             echo "" >> new_entry.md
           fi
-          
+
           # Add changes/refactoring
           if git log $PREV_TAG..$TAG --pretty=format:"%s" | grep -qiE "^(chore|refactor|perf)"; then
             echo "### Changed" >> new_entry.md
@@ -140,7 +138,7 @@ EOF
             git log $PREV_TAG..$TAG --pretty=format:"%s" | grep -iE "^(chore|refactor|perf)" | sed 's/^[^:]*: //' | sed 's/^/- /' >> new_entry.md
             echo "" >> new_entry.md
           fi
-          
+
           # Add documentation
           if git log $PREV_TAG..$TAG --pretty=format:"%s" | grep -qiE "^(docs|doc)"; then
             echo "### Documentation" >> new_entry.md
@@ -148,11 +146,7 @@ EOF
             git log $PREV_TAG..$TAG --pretty=format:"%s" | grep -iE "^(docs|doc)" | sed 's/^[^:]*: //' | sed 's/^/- /' >> new_entry.md
             echo "" >> new_entry.md
           fi
-          
-          # Substitute variables in new_entry.md
-          sed -i "s/\$VERSION/$VERSION/g" new_entry.md
-          sed -i "s/\$DATE/$DATE/g" new_entry.md
-          
+
           # Insert new entry after [Unreleased] section
           if [ -f CHANGELOG.md ]; then
             # Find line number of first version header (## [x.x.x])
@@ -191,9 +185,9 @@ EOF
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          
+
           git add VERSION CHANGELOG.md
-          
+
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
