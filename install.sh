@@ -326,7 +326,7 @@ backup_existing_installation() {
     log_warning "Existing installation detected"
     
     if [ "$INTERACTIVE" = "true" ]; then
-        read -p "Create backup before installing? (Y/n) " -n 1 -r
+        read -p "Create backup before installing? (Y/n) " -n 1 -r < /dev/tty
         echo
         if [[ $REPLY =~ ^[Nn]$ ]]; then
             log_warning "Skipping backup (not recommended)"
@@ -452,7 +452,7 @@ choose_install_mode() {
     echo ""
     
     while true; do
-        read -p "Choose installation mode (1=upgrade, 2=fresh) [1]: " choice
+        read -p "Choose installation mode (1=upgrade, 2=fresh) [1]: " choice < /dev/tty
         choice=${choice:-1}
         
         case $choice in
@@ -465,7 +465,7 @@ choose_install_mode() {
                 INSTALL_MODE="fresh"
                 log_warning "Selected: Fresh install (will remove configs)"
                 echo ""
-                read -p "Are you sure? This will delete all existing configs! (yes/no) [no]: " confirm
+                read -p "Are you sure? This will delete all existing configs! (yes/no) [no]: " confirm < /dev/tty
                 if [ "$confirm" = "yes" ]; then
                     break
                 else
@@ -542,7 +542,7 @@ stop_daemon() {
         touch /tmp/native-launcher-daemon-was-running
         
         if [ "$INTERACTIVE" = "true" ]; then
-            read -p "Stop daemon before installation? (Y/n) " -n 1 -r
+            read -p "Stop daemon before installation? (Y/n) " -n 1 -r < /dev/tty
             echo
             if [[ ! $REPLY =~ ^[Nn]$ ]]; then
                 kill "$daemon_pid" 2>/dev/null && \
@@ -713,12 +713,12 @@ setup_compositor_autostart() {
     # Check if detected config exists
     if [ -f "$detected_config" ]; then
         echo ""
-        read -p "Is this the correct config file? (Y/n) " -n 1 -r
+        read -p "Is this the correct config file? (Y/n) " -n 1 -r < /dev/tty
         echo
         
         if [[ $REPLY =~ ^[Nn]$ ]]; then
             echo ""
-            read -p "Enter path to your compositor config: " config_file
+            read -p "Enter path to your compositor config: " config_file < /dev/tty
             config_file="${config_file/#\~/$HOME}"  # Expand ~ to $HOME
             
             if [ ! -f "$config_file" ]; then
@@ -733,7 +733,7 @@ setup_compositor_autostart() {
     else
         log_warning "Detected config not found: $detected_config"
         echo ""
-        read -p "Enter path to your compositor config (or press Enter to skip): " config_file
+        read -p "Enter path to your compositor config (or press Enter to skip): " config_file < /dev/tty
         
         if [ -z "$config_file" ]; then
             log_info "Skipping daemon auto-start setup"
@@ -789,7 +789,7 @@ setup_compositor_autostart() {
     echo "If validation fails, backup will be auto-restored."
     echo ""
     
-    read -p "Add daemon to auto-start? (y/N) " -n 1 -r
+    read -p "Add daemon to auto-start? (y/N) " -n 1 -r < /dev/tty
     echo
     echo ""
     
@@ -876,7 +876,7 @@ select_theme() {
     echo -e "  5) Gruvbox     - \033[38;2;254;128;25m●\033[0m Orange \033[38;2;254;128;25m(#FE8019)\033[0m on \033[38;2;40;40;40m●\033[0m Dark \033[38;2;40;40;40m(#282828)\033[0m"
     echo -e "  6) Tokyo Night - \033[38;2;122;162;247m●\033[0m Blue \033[38;2;122;162;247m(#7AA2F7)\033[0m on \033[38;2;26;27;38m●\033[0m Night \033[38;2;26;27;38m(#1A1B26)\033[0m"
     echo ""
-    read -p "Enter your choice (1-6) [default: 1]: " theme_choice
+    read -p "Enter your choice (1-6) [default: 1]: " theme_choice < /dev/tty
     
     case ${theme_choice:-1} in
         1) SELECTED_THEME="default" ;;
@@ -946,7 +946,7 @@ create_config() {
     if [ -f "$CONFIG_DIR/config.toml" ]; then
         log_warning "Configuration already exists at $CONFIG_DIR/config.toml"
         if [ "$INTERACTIVE" = "true" ] && [ "$INSTALL_MODE" != "fresh" ]; then
-            read -p "Overwrite existing configuration? (y/N) " -n 1 -r
+            read -p "Overwrite existing configuration? (y/N) " -n 1 -r < /dev/tty
             echo
             if [[ ! $REPLY =~ ^[Yy]$ ]]; then
                 log_info "Keeping existing configuration"
