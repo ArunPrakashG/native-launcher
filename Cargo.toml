@@ -44,6 +44,9 @@ thiserror = "2.0"
 # Cleanup and guards
 scopeguard = "1.2"
 
+# HTTP client for update checking
+ureq = { version = "2.10", features = ["json"] }
+
 # Logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

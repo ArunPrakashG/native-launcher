@@ -9,6 +9,7 @@ pub struct Config {
     pub search: SearchConfig,
     pub ui: UIConfig,
     pub plugins: PluginsConfig,
+    pub updater: UpdaterConfig,
 }
 
 /// Window configuration
@@ -119,6 +120,25 @@ impl Default for PluginsConfig {
             editors: true,
             files: true,
             shell_prefix: ">".to_string(),
+        }
+    }
+}
+
+/// Updater configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct UpdaterConfig {
+    /// Check for updates on startup
+    pub check_on_startup: bool,
+    /// Automatically download updates (currently not implemented)
+    pub auto_download: bool,
+}
+
+impl Default for UpdaterConfig {
+    fn default() -> Self {
+        Self {
+            check_on_startup: true,
+            auto_download: false,
         }
     }
 }

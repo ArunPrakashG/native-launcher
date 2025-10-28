@@ -58,7 +58,7 @@ fn typing_latency_benchmark(c: &mut Criterion) {
 
                 // Return total time and worst keystroke
                 let total: u128 = latencies.iter().map(|(_, lat)| lat).sum();
-                let worst = latencies.iter().map(|(_, lat)| lat).max().unwrap_or(&0);
+                let worst = *latencies.iter().map(|(_, lat)| lat).max().unwrap_or(&0);
 
                 black_box((total, worst))
             })

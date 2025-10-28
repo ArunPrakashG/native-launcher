@@ -4,6 +4,7 @@ mod desktop;
 mod plugins;
 mod search;
 mod ui;
+mod updater;
 mod usage;
 mod utils;
 
@@ -72,6 +73,12 @@ fn run_normal_mode() -> Result<()> {
         UsageTracker::new()
     });
     info!("Loaded usage data for {} apps", usage_tracker.app_count());
+
+    // Check for updates in background (non-blocking)
+    if config.updater.check_on_startup {
+        info!("Checking for updates in background...");
+        let _ = updater::check_for_updates_async();
+    }
 
     // Scan for desktop applications
     info!("Scanning for desktop applications...");
@@ -255,15 +262,23 @@ fn build_ui(
         results_list.update_plugin_results(Vec::new());
         // Hide results container initially
         results_list.container.set_visible(false);
+        // Hide footer and keyboard hints initially
+        search_footer.container.set_visible(false);
+        keyboard_hints.container.set_visible(false);
+        // Collapse window to show only search input
+        launcher_window.window.set_default_height(120);
     }
 
     // Handle search text changes with debouncing to prevent lag
     {
         let results_list = results_list.clone();
         let search_footer_clone = search_footer.clone();
+        let keyboard_hints_clone = keyboard_hints.clone();
         let plugin_manager = plugin_manager.clone();
         let max_results = config.search.max_results;
         let empty_state_on_launch = config.ui.empty_state_on_launch;
+        let window_clone = launcher_window.window.clone();
+        let full_height = config.window.height;
 
         // Debounce timeout holder and cancellation flag
         // We use a counter instead of removing sources to avoid GTK panics
@@ -276,8 +291,16 @@ fn build_ui(
             if empty_state_on_launch {
                 if query.is_empty() {
                     results_list.container.set_visible(false);
+                    search_footer_clone.container.set_visible(false);
+                    keyboard_hints_clone.container.set_visible(false);
+                    // Collapse window to compact size
+                    window_clone.set_default_height(120);
                 } else {
                     results_list.container.set_visible(true);
+                    search_footer_clone.container.set_visible(true);
+                    keyboard_hints_clone.container.set_visible(true);
+                    // Expand window to full size
+                    window_clone.set_default_height(full_height);
                 }
             }
 

@@ -404,26 +404,24 @@ impl ScriptPluginManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
-    use tempfile::TempDir;
 
     #[test]
     fn test_manifest_parsing() {
         let toml = r#"
-            [metadata]
-            name = "Test Plugin"
-            description = "A test plugin"
-            author = "Test Author"
-            version = "1.0.0"
-            priority = 500
-            
-            triggers = ["test ", "t "]
-            
-            [execution]
-            script = "test.sh"
-            interpreter = "bash"
-            output_format = "json"
-            timeout_ms = 2000
+triggers = ["test ", "t "]
+
+[metadata]
+name = "Test Plugin"
+description = "A test plugin"
+author = "Test Author"
+version = "1.0.0"
+priority = 500
+
+[execution]
+script = "test.sh"
+interpreter = "bash"
+output_format = "json"
+timeout_ms = 2000
         "#;
 
         let manifest: ScriptPluginManifest = toml::from_str(toml).unwrap();

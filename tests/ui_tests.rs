@@ -1,3 +1,4 @@
+use gtk4::glib;
 /// UI Testing for Native Launcher
 ///
 /// This module provides integration tests for GTK4 UI components.
@@ -5,7 +6,6 @@
 ///
 /// Run with: cargo test --test ui_tests
 use gtk4::prelude::*;
-use gtk4::{glib, Application};
 use native_launcher::ui::{KeyboardHints, ResultsList, SearchWidget};
 use std::sync::Once;
 
@@ -133,7 +133,7 @@ fn test_results_list_update_results() {
         ];
 
         // Update results
-        results_list.update_results(&entries);
+        results_list.update_results(entries.iter().collect());
 
         // First result should be auto-selected
         let selected = results_list.get_selected_command();
@@ -181,7 +181,7 @@ fn test_results_list_navigation() {
             },
         ];
 
-        results_list.update_results(&entries);
+        results_list.update_results(entries.iter().collect());
 
         // First result selected
         let (exec, _) = results_list.get_selected_command().unwrap();
@@ -224,11 +224,11 @@ fn test_results_list_clear() {
         };
 
         // Add results
-        results_list.update_results(&[entry]);
+        results_list.update_results(vec![&entry]);
         assert!(results_list.get_selected_command().is_some());
 
         // Clear results
-        results_list.update_results(&[]);
+        results_list.update_results(vec![]);
         assert!(results_list.get_selected_command().is_none());
     });
 }
@@ -274,18 +274,22 @@ fn test_results_list_with_actions() {
             no_display: false,
             actions: vec![
                 DesktopAction {
+                    id: "new-window".to_string(),
                     name: "New Window".to_string(),
                     exec: "firefox --new-window".to_string(),
+                    icon: None,
                 },
                 DesktopAction {
+                    id: "private-window".to_string(),
                     name: "Private Window".to_string(),
                     exec: "firefox --private-window".to_string(),
+                    icon: None,
                 },
             ],
         };
 
         // Update results with entry that has actions
-        results_list.update_results(&[entry]);
+        results_list.update_results(vec![&entry]);
 
         // First item should be the app itself
         let (exec, _) = results_list.get_selected_command().unwrap();
@@ -324,7 +328,7 @@ fn test_terminal_app_flag() {
             actions: vec![],
         };
 
-        results_list.update_results(&[terminal_entry]);
+        results_list.update_results(vec![&terminal_entry]);
 
         // Verify terminal flag is preserved
         let (exec, terminal) = results_list.get_selected_command().unwrap();
