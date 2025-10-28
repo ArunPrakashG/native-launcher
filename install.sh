@@ -24,6 +24,75 @@ DESKTOP_DIR="$HOME/.local/share/applications"
 # Interactive mode flag
 INTERACTIVE=true
 SELECTED_THEME="default"
+INSTALL_MODE="upgrade"  # "upgrade" or "fresh"
+SKIP_BACKUP=false
+
+# Parse command line arguments
+parse_arguments() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --non-interactive)
+                INTERACTIVE=false
+                shift
+                ;;
+            --fresh)
+                INSTALL_MODE="fresh"
+                shift
+                ;;
+            --upgrade)
+                INSTALL_MODE="upgrade"
+                shift
+                ;;
+            --skip-backup)
+                SKIP_BACKUP=true
+                shift
+                ;;
+            --theme)
+                SELECTED_THEME="$2"
+                shift 2
+                ;;
+            --help|-h)
+                show_help
+                exit 0
+                ;;
+            *)
+                log_error "Unknown option: $1"
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+}
+
+# Show help message
+show_help() {
+    cat << EOF
+Native Launcher Installation Script v${SCRIPT_VERSION}
+
+Usage: $0 [OPTIONS]
+
+Options:
+  --non-interactive    Skip all interactive prompts (use defaults)
+  --fresh              Fresh installation (remove existing configs)
+  --upgrade            Upgrade installation (keep existing configs) [default]
+  --skip-backup        Skip backup creation (not recommended)
+  --theme THEME        Set theme without prompt (default, nord, dracula, 
+                       catppuccin, gruvbox, tokyonight)
+  -h, --help           Show this help message
+
+Examples:
+  # Interactive installation (recommended)
+  $0
+
+  # Non-interactive upgrade with Nord theme
+  $0 --non-interactive --upgrade --theme nord
+
+  # Fresh install without prompts
+  $0 --non-interactive --fresh --theme default
+
+EOF
+}
+
 
 # Logging functions
 log_info() {
@@ -220,6 +289,12 @@ download_and_install() {
 
 # Backup existing installation
 backup_existing_installation() {
+    # Skip backup if flag is set
+    if [ "$SKIP_BACKUP" = true ]; then
+        log_warning "Skipping backup (--skip-backup flag set)"
+        return 0
+    fi
+    
     log_info "Checking for existing installation..."
     
     local backup_needed=false
@@ -260,40 +335,60 @@ backup_existing_installation() {
     fi
     
     # Create backup directory
-    mkdir -p "$backup_dir"
+    mkdir -p "$backup_dir" || {
+        log_error "Failed to create backup directory"
+        return 1
+    }
     log_info "Creating backup at $backup_dir..."
     
     # Backup binary
     if [ -f "$INSTALL_DIR/native-launcher" ]; then
-        cp "$INSTALL_DIR/native-launcher" "$backup_dir/native-launcher"
-        log_success "Backed up binary"
+        cp "$INSTALL_DIR/native-launcher" "$backup_dir/native-launcher" 2>/dev/null && \
+            log_success "Backed up binary" || \
+            log_warning "Failed to backup binary"
     fi
     
     # Backup configuration
     if [ -f "$CONFIG_DIR/config.toml" ]; then
-        mkdir -p "$backup_dir/config"
-        cp "$CONFIG_DIR/config.toml" "$backup_dir/config/config.toml"
-        log_success "Backed up configuration"
+        mkdir -p "$backup_dir/config" 2>/dev/null
+        cp "$CONFIG_DIR/config.toml" "$backup_dir/config/config.toml" 2>/dev/null && \
+            log_success "Backed up configuration" || \
+            log_warning "Failed to backup configuration"
     fi
     
     # Backup plugins directory
     if [ -d "$CONFIG_DIR/plugins" ]; then
-        cp -r "$CONFIG_DIR/plugins" "$backup_dir/config/"
-        log_success "Backed up plugins"
+        cp -r "$CONFIG_DIR/plugins" "$backup_dir/config/" 2>/dev/null && \
+            log_success "Backed up plugins" || \
+            log_warning "Failed to backup plugins"
     fi
     
     # Backup cache
     if [ -d "$HOME/.cache/native-launcher" ]; then
-        mkdir -p "$backup_dir/cache"
-        cp -r "$HOME/.cache/native-launcher/"* "$backup_dir/cache/" 2>/dev/null || true
-        log_success "Backed up cache"
+        mkdir -p "$backup_dir/cache" 2>/dev/null
+        cp -r "$HOME/.cache/native-launcher/"* "$backup_dir/cache/" 2>/dev/null && \
+            log_success "Backed up cache" || \
+            log_warning "Cache backup skipped (empty or inaccessible)"
     fi
     
-    # Backup usage data
+    # Backup usage data (exclude backups directory to avoid recursion)
     if [ -d "$HOME/.local/share/native-launcher" ]; then
-        mkdir -p "$backup_dir/data"
-        cp -r "$HOME/.local/share/native-launcher/"* "$backup_dir/data/" 2>/dev/null || true
-        log_success "Backed up usage data"
+        mkdir -p "$backup_dir/data" 2>/dev/null
+        # Copy everything except the backups directory
+        local backed_up=false
+        for item in "$HOME/.local/share/native-launcher/"*; do
+            [ -e "$item" ] || continue  # Skip if no files exist
+            if [ "$(basename "$item")" != "backups" ]; then
+                if cp -r "$item" "$backup_dir/data/" 2>/dev/null; then
+                    backed_up=true
+                fi
+            fi
+        done
+        if [ "$backed_up" = true ]; then
+            log_success "Backed up usage data"
+        else
+            log_warning "Usage data backup skipped (empty or inaccessible)"
+        fi
     fi
     
     # Create backup info file
@@ -322,8 +417,445 @@ EOF
     echo ""
 }
 
+# Choose installation mode (fresh vs upgrade)
+choose_install_mode() {
+    # Skip if already set via CLI or non-interactive
+    if [ "$INTERACTIVE" != "true" ]; then
+        return
+    fi
+    
+    # Only ask if existing installation found
+    if [ ! -f "$CONFIG_DIR/config.toml" ] && [ ! -f "$INSTALL_DIR/native-launcher" ]; then
+        log_info "No existing installation found, proceeding with fresh install"
+        INSTALL_MODE="fresh"
+        return
+    fi
+    
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "  Installation Mode"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    echo "Existing installation detected. How would you like to proceed?"
+    echo ""
+    echo "  [1] Upgrade - Keep existing configs and data (recommended)"
+    echo "      • Binary will be updated"
+    echo "      • Your configuration will be preserved"
+    echo "      • Usage data and cache remain intact"
+    echo "      • Backup will be created"
+    echo ""
+    echo "  [2] Fresh Install - Remove all existing data"
+    echo "      • All configs will be deleted"
+    echo "      • Cache and usage data will be cleared"
+    echo "      • You'll configure theme again"
+    echo "      • Backup will be created first"
+    echo ""
+    
+    while true; do
+        read -p "Choose installation mode (1=upgrade, 2=fresh) [1]: " choice
+        choice=${choice:-1}
+        
+        case $choice in
+            1)
+                INSTALL_MODE="upgrade"
+                log_info "Selected: Upgrade (keep existing configs)"
+                break
+                ;;
+            2)
+                INSTALL_MODE="fresh"
+                log_warning "Selected: Fresh install (will remove configs)"
+                echo ""
+                read -p "Are you sure? This will delete all existing configs! (yes/no) [no]: " confirm
+                if [ "$confirm" = "yes" ]; then
+                    break
+                else
+                    log_info "Cancelled fresh install, switching to upgrade mode"
+                    INSTALL_MODE="upgrade"
+                    break
+                fi
+                ;;
+            *)
+                log_error "Invalid choice. Please enter 1 or 2"
+                ;;
+        esac
+    done
+    
+    echo ""
+}
+
+# Clean existing installation (for fresh install mode)
+clean_existing_installation() {
+    if [ "$INSTALL_MODE" != "fresh" ]; then
+        return
+    fi
+    
+    log_warning "Performing fresh install - removing existing configs..."
+    
+    # Remove config directory
+    if [ -d "$CONFIG_DIR" ]; then
+        rm -rf "$CONFIG_DIR"
+        log_success "Removed configuration directory"
+    fi
+    
+    # Remove cache
+    if [ -d "$HOME/.cache/native-launcher" ]; then
+        rm -rf "$HOME/.cache/native-launcher"
+        log_success "Removed cache directory"
+    fi
+    
+    # Remove data (but keep backups)
+    if [ -d "$HOME/.local/share/native-launcher" ]; then
+        # Move backups temporarily
+        local temp_backups=""
+        if [ -d "$HOME/.local/share/native-launcher/backups" ]; then
+            temp_backups=$(mktemp -d)
+            mv "$HOME/.local/share/native-launcher/backups" "$temp_backups/"
+        fi
+        
+        # Remove data directory
+        rm -rf "$HOME/.local/share/native-launcher"
+        
+        # Restore backups
+        if [ -n "$temp_backups" ]; then
+            mkdir -p "$HOME/.local/share/native-launcher"
+            mv "$temp_backups/backups" "$HOME/.local/share/native-launcher/"
+            rm -rf "$temp_backups"
+        fi
+        
+        log_success "Removed data directory (backups preserved)"
+    fi
+    
+    echo ""
+}
+
+# Stop daemon if running
+stop_daemon() {
+    log_info "Checking for running daemon..."
+    
+    # Find daemon process
+    local daemon_pid=$(pgrep -f "native-launcher.*--daemon" 2>/dev/null)
+    
+    if [ -n "$daemon_pid" ]; then
+        log_warning "Found running daemon (PID: $daemon_pid)"
+        
+        # Mark that daemon was running (for restart after installation)
+        touch /tmp/native-launcher-daemon-was-running
+        
+        if [ "$INTERACTIVE" = "true" ]; then
+            read -p "Stop daemon before installation? (Y/n) " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+                kill "$daemon_pid" 2>/dev/null && \
+                    log_success "Daemon stopped" || \
+                    log_warning "Failed to stop daemon"
+                sleep 1
+            else
+                log_warning "Daemon still running - installation may require manual restart"
+                rm -f /tmp/native-launcher-daemon-was-running
+            fi
+        else
+            # Non-interactive: always stop daemon
+            kill "$daemon_pid" 2>/dev/null && \
+                log_success "Daemon stopped" || \
+                log_warning "Failed to stop daemon"
+            sleep 1
+        fi
+    else
+        log_info "No daemon running"
+    fi
+}
+
+# Check if daemon should be restarted after installation
+should_restart_daemon() {
+    # Check if daemon was running before (marked by stop_daemon)
+    if [ -f "/tmp/native-launcher-daemon-was-running" ]; then
+        return 0
+    fi
+    
+    return 1
+}
+
+# Restart daemon if it was running before
+restart_daemon() {
+    if ! should_restart_daemon; then
+        return
+    fi
+    
+    log_info "Restarting daemon..."
+    
+    # Start daemon manually (compositor auto-start will handle it on next restart)
+    nohup "$INSTALL_DIR/native-launcher" --daemon >/dev/null 2>&1 &
+    log_success "Daemon started in background"
+    
+    # Clean up marker file
+    rm -f /tmp/native-launcher-daemon-was-running
+}
+
+# Detect compositor config file
+get_compositor_config_path() {
+    case "$COMPOSITOR" in
+        hyprland)
+            echo "$HOME/.config/hypr/hyprland.conf"
+            ;;
+        sway)
+            echo "$HOME/.config/sway/config"
+            ;;
+        i3)
+            echo "$HOME/.config/i3/config"
+            ;;
+        river)
+            echo "$HOME/.config/river/init"
+            ;;
+        wayfire)
+            echo "$HOME/.config/wayfire.ini"
+            ;;
+        *)
+            echo ""
+            ;;
+    esac
+}
+
+# Get auto-start command format for compositor
+get_autostart_command() {
+    local binary="$INSTALL_DIR/native-launcher"
+    
+    case "$COMPOSITOR" in
+        hyprland)
+            echo "exec-once = $binary --daemon"
+            ;;
+        sway)
+            echo "exec $binary --daemon"
+            ;;
+        i3)
+            echo "exec --no-startup-id $binary --daemon"
+            ;;
+        river)
+            echo "riverctl spawn \"$binary --daemon\""
+            ;;
+        wayfire)
+            echo "autostart_native_launcher = $binary --daemon"
+            ;;
+        *)
+            echo ""
+            ;;
+    esac
+}
+
+# Remove old daemon entries from compositor config
+remove_old_daemon_entries() {
+    local config_file="$1"
+    
+    if [ ! -f "$config_file" ]; then
+        return
+    fi
+    
+    # Create temp file without daemon entries
+    grep -v "native-launcher.*--daemon" "$config_file" > "${config_file}.tmp" || true
+    mv "${config_file}.tmp" "$config_file"
+}
+
+# Validate compositor config
+validate_compositor_config() {
+    local config_file="$1"
+    
+    case "$COMPOSITOR" in
+        sway)
+            # Sway has built-in validation
+            if command -v sway >/dev/null 2>&1; then
+                sway --validate --config "$config_file" >/dev/null 2>&1
+                return $?
+            fi
+            ;;
+        i3)
+            # i3 has built-in validation
+            if command -v i3 >/dev/null 2>&1; then
+                i3 -C -c "$config_file" >/dev/null 2>&1
+                return $?
+            fi
+            ;;
+        hyprland|river|wayfire)
+            # No built-in validators, just check file exists and is readable
+            [ -f "$config_file" ] && [ -r "$config_file" ]
+            return $?
+            ;;
+    esac
+    
+    # Default: assume valid if file exists
+    [ -f "$config_file" ]
+    return $?
+}
+
+# Setup compositor auto-start (replaces systemd approach)
+setup_compositor_autostart() {
+    if [ "$INTERACTIVE" != "true" ]; then
+        return
+    fi
+    
+    # Get default compositor config path
+    local detected_config=$(get_compositor_config_path)
+    local config_file=""
+    
+    if [ -z "$detected_config" ]; then
+        log_warning "Compositor auto-start not supported for $COMPOSITOR"
+        log_info "To enable daemon mode, add to your compositor config:"
+        echo "  $INSTALL_DIR/native-launcher --daemon"
+        return
+    fi
+    
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "  Compositor Auto-Start Configuration"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    echo "Detected compositor: $COMPOSITOR"
+    echo "Detected config file: $detected_config"
+    
+    # Check if detected config exists
+    if [ -f "$detected_config" ]; then
+        echo ""
+        read -p "Is this the correct config file? (Y/n) " -n 1 -r
+        echo
+        
+        if [[ $REPLY =~ ^[Nn]$ ]]; then
+            echo ""
+            read -p "Enter path to your compositor config: " config_file
+            config_file="${config_file/#\~/$HOME}"  # Expand ~ to $HOME
+            
+            if [ ! -f "$config_file" ]; then
+                log_error "Config file not found: $config_file"
+                return
+            fi
+            
+            log_success "Using custom config: $config_file"
+        else
+            config_file="$detected_config"
+        fi
+    else
+        log_warning "Detected config not found: $detected_config"
+        echo ""
+        read -p "Enter path to your compositor config (or press Enter to skip): " config_file
+        
+        if [ -z "$config_file" ]; then
+            log_info "Skipping daemon auto-start setup"
+            log_info "To enable manually, add to your compositor config:"
+            echo "  $INSTALL_DIR/native-launcher --daemon"
+            return
+        fi
+        
+        config_file="${config_file/#\~/$HOME}"  # Expand ~ to $HOME
+        
+        if [ ! -f "$config_file" ]; then
+            log_error "Config file not found: $config_file"
+            return
+        fi
+    fi
+    
+    # Check if already configured (upgrade mode)
+    if [ "$INSTALL_MODE" = "upgrade" ] && grep -q "native-launcher.*--daemon" "$config_file" 2>/dev/null; then
+        log_info "Daemon auto-start already configured in: $config_file"
+        return
+    fi
+    
+    # Get auto-start command
+    local autostart_cmd=$(get_autostart_command)
+    
+    if [ -z "$autostart_cmd" ]; then
+        return
+    fi
+    
+    echo ""
+    echo "Configuration Summary:"
+    echo "  Config file: $config_file"
+    echo ""
+    echo "This will add native-launcher daemon to auto-start:"
+    echo "  $autostart_cmd"
+    echo ""
+    echo "Benefits:"
+    echo "  • Launcher pre-loads on compositor startup"
+    echo "  • Instant appearance when pressing Super+Space"
+    echo "  • No manual daemon management needed"
+    echo ""
+    echo "Trade-offs:"
+    echo "  • Uses ~20-30MB RAM constantly"
+    echo ""
+    echo "⚠️  WARNING: This will modify your compositor config"
+    echo ""
+    
+    # Create backup filename
+    local backup_file="${config_file}.backup-$(date +%Y%m%d_%H%M%S)"
+    echo "Backup will be created at:"
+    echo "  $backup_file"
+    echo ""
+    echo "If validation fails, backup will be auto-restored."
+    echo ""
+    
+    read -p "Add daemon to auto-start? (y/N) " -n 1 -r
+    echo
+    echo ""
+    
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        log_info "Compositor auto-start skipped"
+        return
+    fi
+    
+    # Create backup
+    log_info "Creating backup..."
+    cp "$config_file" "$backup_file" || {
+        log_error "Failed to create backup"
+        return 1
+    }
+    log_success "Backup created: $backup_file"
+    
+    # Remove old entries (avoid duplicates)
+    log_info "Removing old daemon entries (if any)..."
+    remove_old_daemon_entries "$config_file"
+    
+    # Add auto-start command
+    log_info "Adding daemon to compositor config..."
+    echo "" >> "$config_file"
+    echo "# Native Launcher Daemon - Added by installer on $(date +%Y-%m-%d)" >> "$config_file"
+    echo "$autostart_cmd" >> "$config_file"
+    
+    # Validate config
+    log_info "Validating compositor config..."
+    if validate_compositor_config "$config_file"; then
+        log_success "Config validation passed"
+        log_success "Daemon auto-start configured!"
+        echo ""
+        echo "Restart your compositor to apply changes:"
+        case "$COMPOSITOR" in
+            hyprland)
+                echo "  hyprctl reload"
+                ;;
+            sway)
+                echo "  swaymsg reload"
+                ;;
+            i3)
+                echo "  i3-msg reload"
+                ;;
+            river)
+                echo "  Restart River"
+                ;;
+        esac
+    else
+        log_error "Config validation failed!"
+        log_warning "Restoring backup..."
+        mv "$backup_file" "$config_file"
+        log_success "Backup restored"
+        echo ""
+        echo "Manual setup required. Add to $config_file:"
+        echo "  $autostart_cmd"
+    fi
+}
+
 # Interactive theme selection
 select_theme() {
+    # Skip theme selection in upgrade mode (keep existing config)
+    if [ "$INSTALL_MODE" = "upgrade" ] && [ -f "$CONFIG_DIR/config.toml" ]; then
+        log_info "Upgrade mode: Skipping theme selection (keeping existing theme)"
+        return
+    fi
+    
     if [ "$INTERACTIVE" != "true" ]; then
         SELECTED_THEME="default"
         return
@@ -336,12 +868,13 @@ select_theme() {
     echo ""
     echo "Choose your preferred theme:"
     echo ""
-    echo "  1) Default    - Coral (#FF6363) on Charcoal (#1C1C1E)"
-    echo "  2) Nord       - Nord Frost (#88C0D0) on Nord Polar (#2E3440)"
-    echo "  3) Dracula    - Dracula Purple (#BD93F9) on Dark (#282A36)"
-    echo "  4) Catppuccin - Catppuccin Lavender (#B4BEFE) on Mocha (#1E1E2E)"
-    echo "  5) Gruvbox    - Gruvbox Orange (#FE8019) on Dark (#282828)"
-    echo "  6) Tokyo Night- Tokyo Night Blue (#7AA2F7) on Night (#1A1B26)"
+    # Display themes with their actual colors
+    echo -e "  1) Default     - \033[38;2;255;99;99m●\033[0m Coral \033[38;2;255;99;99m(#FF6363)\033[0m on \033[38;2;28;28;30m●\033[0m Charcoal \033[38;2;28;28;30m(#1C1C1E)\033[0m"
+    echo -e "  2) Nord        - \033[38;2;136;192;208m●\033[0m Frost \033[38;2;136;192;208m(#88C0D0)\033[0m on \033[38;2;46;52;64m●\033[0m Polar \033[38;2;46;52;64m(#2E3440)\033[0m"
+    echo -e "  3) Dracula     - \033[38;2;189;147;249m●\033[0m Purple \033[38;2;189;147;249m(#BD93F9)\033[0m on \033[38;2;40;42;54m●\033[0m Dark \033[38;2;40;42;54m(#282A36)\033[0m"
+    echo -e "  4) Catppuccin  - \033[38;2;180;190;254m●\033[0m Lavender \033[38;2;180;190;254m(#B4BEFE)\033[0m on \033[38;2;30;30;46m●\033[0m Mocha \033[38;2;30;30;46m(#1E1E2E)\033[0m"
+    echo -e "  5) Gruvbox     - \033[38;2;254;128;25m●\033[0m Orange \033[38;2;254;128;25m(#FE8019)\033[0m on \033[38;2;40;40;40m●\033[0m Dark \033[38;2;40;40;40m(#282828)\033[0m"
+    echo -e "  6) Tokyo Night - \033[38;2;122;162;247m●\033[0m Blue \033[38;2;122;162;247m(#7AA2F7)\033[0m on \033[38;2;26;27;38m●\033[0m Night \033[38;2;26;27;38m(#1A1B26)\033[0m"
     echo ""
     read -p "Enter your choice (1-6) [default: 1]: " theme_choice
     
@@ -403,18 +936,22 @@ create_config() {
     
     mkdir -p "$CONFIG_DIR"
     
+    # In upgrade mode, keep existing config
+    if [ "$INSTALL_MODE" = "upgrade" ] && [ -f "$CONFIG_DIR/config.toml" ]; then
+        log_info "Upgrade mode: Keeping existing configuration"
+        return
+    fi
+    
+    # In fresh mode or if no config exists, create new one
     if [ -f "$CONFIG_DIR/config.toml" ]; then
         log_warning "Configuration already exists at $CONFIG_DIR/config.toml"
-        if [ "$INTERACTIVE" = "true" ]; then
+        if [ "$INTERACTIVE" = "true" ] && [ "$INSTALL_MODE" != "fresh" ]; then
             read -p "Overwrite existing configuration? (y/N) " -n 1 -r
             echo
             if [[ ! $REPLY =~ ^[Yy]$ ]]; then
                 log_info "Keeping existing configuration"
                 return
             fi
-        else
-            log_info "Keeping existing configuration (non-interactive mode)"
-            return
         fi
     fi
     
@@ -621,11 +1158,32 @@ print_completion() {
     echo "  Theme: $SELECTED_THEME"
     echo "  Binary: $INSTALL_DIR/native-launcher"
     echo "  Config: $CONFIG_DIR/config.toml"
+    
+    # Show daemon status
+    local config_file=$(get_compositor_config_path)
+    if [ -n "$config_file" ] && [ -f "$config_file" ] && grep -q "native-launcher.*--daemon" "$config_file" 2>/dev/null; then
+        echo "  Daemon: Enabled (compositor auto-start)"
+    elif pgrep -f "native-launcher.*--daemon" >/dev/null 2>&1; then
+        echo "  Daemon: Running (manual)"
+    else
+        echo "  Daemon: Disabled"
+    fi
+    
     echo ""
     echo "Quick Start:"
     echo "  1. Press Super+Space to launch (if keybind configured)"
     echo "  2. Or run: $INSTALL_DIR/native-launcher"
     echo "  3. Edit config: $CONFIG_DIR/config.toml"
+    
+    # Add daemon management tips if enabled
+    if [ -n "$config_file" ] && [ -f "$config_file" ] && grep -q "native-launcher.*--daemon" "$config_file" 2>/dev/null; then
+        echo ""
+        echo "Daemon Management:"
+        echo "  Config: $config_file"
+        echo "  To disable: Remove daemon line from config and restart compositor"
+        echo "  Check status: pgrep -f 'native-launcher.*--daemon'"
+    fi
+    
     echo ""
     echo "Documentation: https://github.com/$GITHUB_REPO/wiki"
     echo ""
@@ -641,12 +1199,24 @@ main() {
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
     
+    # Parse command line arguments
+    parse_arguments "$@"
+    
     # Detect system
     detect_distro
     detect_compositor
     
+    # Choose installation mode (upgrade vs fresh)
+    choose_install_mode
+    
     # Backup existing installation before making changes
     backup_existing_installation
+    
+    # Clean existing installation if fresh mode
+    clean_existing_installation
+    
+    # Stop daemon before installation
+    stop_daemon
     
     # Check and install dependencies
     check_dependencies
@@ -665,6 +1235,12 @@ main() {
     # Setup compositor integration
     setup_compositor_integration
     
+    # Setup compositor auto-start (daemon mode)
+    setup_compositor_autostart
+    
+    # Restart daemon if it was running before
+    restart_daemon
+    
     # Verify installation
     if verify_installation; then
         print_completion
@@ -674,37 +1250,5 @@ main() {
     fi
 }
 
-# Handle script arguments
-case "${1:-}" in
-    --help|-h)
-        echo "Native Launcher Installation Script"
-        echo ""
-        echo "Usage: $0 [OPTIONS]"
-        echo ""
-        echo "Options:"
-        echo "  --help, -h          Show this help message"
-        echo "  --version, -v       Show script version"
-        echo "  --non-interactive   Skip interactive prompts (use defaults)"
-        echo ""
-        echo "This script will:"
-        echo "  1. Detect your system and compositor"
-        echo "  2. Install required dependencies"
-        echo "  3. Download the latest release"
-        echo "  4. Install the binary to ~/.local/bin"
-        echo "  5. Let you choose a theme (interactive mode)"
-        echo "  6. Create configuration with selected theme"
-        echo "  7. Setup compositor keybinds (if supported)"
-        exit 0
-        ;;
-    --version|-v)
-        echo "Native Launcher Installation Script v$SCRIPT_VERSION"
-        exit 0
-        ;;
-    --non-interactive)
-        INTERACTIVE=false
-        main
-        ;;
-    *)
-        main
-        ;;
-esac
+# Run main function with all arguments
+main "$@"
