@@ -75,7 +75,7 @@ list_backups() {
     fi
     
     # Ask user to select backup
-    read -p "Select backup to restore (1-$count) or 'q' to quit: " selection
+    read -p "Select backup to restore (1-$count) or 'q' to quit: " selection < /dev/tty
     
     if [ "$selection" = "q" ] || [ "$selection" = "Q" ]; then
         log_info "Restore cancelled"
@@ -193,7 +193,7 @@ main() {
     
     echo ""
     log_warning "This will restore Native Launcher from the selected backup"
-    read -p "Continue with restore? (y/N) " -n 1 -r
+    read -p "Continue with restore? (y/N) " -n 1 -r < /dev/tty
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         log_info "Restore cancelled"

@@ -20,6 +20,8 @@ GITHUB_REPO="ArunPrakashG/native-launcher"
 INSTALL_DIR="$HOME/.local/bin"
 CONFIG_DIR="$HOME/.config/native-launcher"
 DESKTOP_DIR="$HOME/.local/share/applications"
+SYMLINK_INSTALL=false
+SYMLINK_TARGET="/usr/local/bin/native-launcher"
 
 # Interactive mode flag
 INTERACTIVE=true
@@ -45,6 +47,10 @@ parse_arguments() {
                 ;;
             --skip-backup)
                 SKIP_BACKUP=true
+                shift
+                ;;
+            --link)
+                SYMLINK_INSTALL=true
                 shift
                 ;;
             --theme)
@@ -76,19 +82,35 @@ Options:
   --fresh              Fresh installation (remove existing configs)
   --upgrade            Upgrade installation (keep existing configs) [default]
   --skip-backup        Skip backup creation (not recommended)
+  --link               Create symlink in /usr/local/bin (requires sudo)
   --theme THEME        Set theme without prompt (default, nord, dracula, 
                        catppuccin, gruvbox, tokyonight)
   -h, --help           Show this help message
 
+Installation Workflow:
+  1. Default: Install to ~/.local/bin (no sudo required)
+     - Uses absolute paths in compositor configs
+     - Works immediately, fully functional
+  
+  2. Optional: Run with --link to create system symlink
+     - Creates symlink: /usr/local/bin/native-launcher -> ~/.local/bin/native-launcher
+     - Updates compositor configs to use 'native-launcher' (PATH-based)
+     - Requires sudo for symlink creation only
+     - Updates don't need sudo (just update source binary)
+
 Examples:
-  # Interactive installation (recommended)
+  # Initial installation (no sudo)
   $0
 
-  # Non-interactive upgrade with Nord theme
-  $0 --non-interactive --upgrade --theme nord
+  # Add system-wide symlink (one-time sudo for symlink)
+  $0 --link
 
-  # Fresh install without prompts
-  $0 --non-interactive --fresh --theme default
+  # Fresh install with Nord theme, then symlink
+  $0 --fresh --theme nord
+  $0 --link
+
+  # Non-interactive install with symlink
+  $0 --non-interactive --link
 
 EOF
 }
@@ -673,7 +695,13 @@ get_keybind_patterns() {
 
 # Get recommended keybind for compositor
 get_recommended_keybind() {
-    local binary="native-launcher"
+    # Check if symlink exists, use short name, otherwise use absolute path
+    local binary
+    if [ -L "$SYMLINK_TARGET" ] && [ -e "$SYMLINK_TARGET" ]; then
+        binary="native-launcher"  # Use PATH-based name (symlink exists)
+    else
+        binary="$INSTALL_DIR/native-launcher"  # Use absolute path
+    fi
     
     case "$COMPOSITOR" in
         hyprland)
@@ -732,7 +760,14 @@ update_keybind() {
 
 # Get auto-start command format for compositor
 get_autostart_command() {
-    local binary="native-launcher"  # Use binary name from PATH, not absolute path
+    # Check if symlink exists, use short name, otherwise use absolute path
+    local binary
+    if [ -L "$SYMLINK_TARGET" ] && [ -e "$SYMLINK_TARGET" ]; then
+        binary="native-launcher"  # Use PATH-based name (symlink exists)
+    else
+        binary="$INSTALL_DIR/native-launcher"  # Use absolute path
+    fi
+    
     local use_session_mgr="$1"
     
     # Wrap with session manager if requested
@@ -763,6 +798,141 @@ get_autostart_command() {
             echo ""
             ;;
     esac
+}
+
+# Create system-wide symlink
+create_symlink() {
+    if [ "$SYMLINK_INSTALL" != "true" ]; then
+        return
+    fi
+    
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "  System-Wide Symlink Setup"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    
+    # Check if binary exists
+    if [ ! -f "$INSTALL_DIR/native-launcher" ]; then
+        log_error "Binary not found at $INSTALL_DIR/native-launcher"
+        log_info "Please run installation without --link first"
+        return 1
+    fi
+    
+    # Check if sudo is available
+    if ! command -v sudo >/dev/null 2>&1; then
+        log_error "Symlink creation requires sudo, but sudo is not available"
+        return 1
+    fi
+    
+    log_info "This will create a symlink for system-wide access:"
+    echo "  Source: $INSTALL_DIR/native-launcher"
+    echo "  Target: $SYMLINK_TARGET"
+    echo ""
+    echo "Benefits:"
+    echo "  • Available as 'native-launcher' from anywhere"
+    echo "  • No absolute paths needed in compositor configs"
+    echo "  • Updates don't require sudo (just update source)"
+    echo ""
+    echo "Note: Requires sudo for symlink creation only"
+    echo ""
+    
+    if [ "$INTERACTIVE" = "true" ]; then
+        read -p "Create system-wide symlink? (Y/n) " -n 1 -r < /dev/tty
+        echo
+        if [[ $REPLY =~ ^[Nn]$ ]]; then
+            log_info "Symlink creation skipped"
+            return 0
+        fi
+    fi
+    
+    # Check if symlink already exists
+    if [ -L "$SYMLINK_TARGET" ]; then
+        log_info "Symlink already exists at $SYMLINK_TARGET"
+        
+        # Check if it points to our binary
+        local current_target=$(readlink -f "$SYMLINK_TARGET")
+        local our_binary=$(readlink -f "$INSTALL_DIR/native-launcher")
+        
+        if [ "$current_target" = "$our_binary" ]; then
+            log_success "Symlink already points to correct location"
+        else
+            log_warning "Symlink points to: $current_target"
+            log_info "Updating symlink to point to: $our_binary"
+            sudo rm "$SYMLINK_TARGET"
+            sudo ln -s "$INSTALL_DIR/native-launcher" "$SYMLINK_TARGET"
+            log_success "Symlink updated"
+        fi
+    elif [ -f "$SYMLINK_TARGET" ]; then
+        log_error "Regular file exists at $SYMLINK_TARGET"
+        log_warning "Cannot create symlink. Please remove or rename the existing file."
+        return 1
+    else
+        # Create new symlink
+        log_info "Creating symlink..."
+        sudo ln -s "$INSTALL_DIR/native-launcher" "$SYMLINK_TARGET"
+        log_success "Symlink created: $SYMLINK_TARGET -> $INSTALL_DIR/native-launcher"
+    fi
+    
+    # Verify symlink works
+    if [ -L "$SYMLINK_TARGET" ] && [ -e "$SYMLINK_TARGET" ]; then
+        log_success "Symlink verified successfully"
+        echo ""
+        echo "You can now use 'native-launcher' from anywhere!"
+        echo ""
+        
+        # Update compositor configs to use short name
+        update_configs_for_symlink
+    else
+        log_error "Symlink verification failed"
+        return 1
+    fi
+}
+
+# Update compositor configs to use short name instead of absolute path
+update_configs_for_symlink() {
+    log_info "Updating compositor configurations to use 'native-launcher'..."
+    
+    local config_file=$(get_compositor_config_path)
+    
+    if [ -z "$config_file" ] || [ ! -f "$config_file" ]; then
+        log_info "No compositor config found to update"
+        return 0
+    fi
+    
+    # Check if config contains absolute path
+    if ! grep -q "$INSTALL_DIR/native-launcher" "$config_file" 2>/dev/null; then
+        log_info "Config already uses short name or doesn't contain native-launcher"
+        return 0
+    fi
+    
+    # Create backup
+    local backup_file="${config_file}.backup-symlink-$(date +%Y%m%d_%H%M%S)"
+    cp "$config_file" "$backup_file"
+    log_info "Created backup: $backup_file"
+    
+    # Replace absolute path with short name
+    sed -i "s|$INSTALL_DIR/native-launcher|native-launcher|g" "$config_file"
+    
+    log_success "Updated compositor config to use 'native-launcher'"
+    echo ""
+    echo "Changes made to: $config_file"
+    echo "  Before: $INSTALL_DIR/native-launcher"
+    echo "  After:  native-launcher"
+    echo ""
+    echo "Reload your compositor to apply changes:"
+    case "$COMPOSITOR" in
+        hyprland)
+            echo "  hyprctl reload"
+            ;;
+        sway)
+            echo "  swaymsg reload"
+            ;;
+        i3)
+            echo "  i3-msg reload"
+            ;;
+    esac
+    echo ""
 }
 
 # Remove old daemon entries from compositor config
@@ -972,7 +1142,7 @@ setup_keybinds() {
         # Handle Wayfire's special case (needs two lines)
         if [ "$COMPOSITOR" = "wayfire" ]; then
             echo "binding_launcher = <super> KEY_SPACE" >> "$config_file"
-            echo "command_launcher = native-launcher" >> "$config_file"
+            echo "command_launcher = $INSTALL_DIR/native-launcher" >> "$config_file"
         else
             echo "$recommended" >> "$config_file"
         fi
@@ -1518,29 +1688,34 @@ verify_installation() {
     
     # Check if directory is in PATH
     if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
-        log_warning "$INSTALL_DIR is not in your PATH"
-        log_info "Adding $INSTALL_DIR to PATH in shell config..."
-        
-        # Detect shell config file
-        if [ -n "$ZSH_VERSION" ] || [ -f "$HOME/.zshrc" ]; then
-            SHELL_RC="$HOME/.zshrc"
-        elif [ -n "$BASH_VERSION" ] || [ -f "$HOME/.bashrc" ]; then
-            SHELL_RC="$HOME/.bashrc"
+        # Check if symlink exists - if so, no PATH modification needed
+        if [ -L "$SYMLINK_TARGET" ] && [ -e "$SYMLINK_TARGET" ]; then
+            log_info "Symlink exists at $SYMLINK_TARGET - no PATH configuration needed"
         else
-            SHELL_RC="$HOME/.profile"
+            log_warning "$INSTALL_DIR is not in your PATH"
+            log_info "Adding $INSTALL_DIR to PATH in shell config..."
+            
+            # Detect shell config file
+            if [ -n "$ZSH_VERSION" ] || [ -f "$HOME/.zshrc" ]; then
+                SHELL_RC="$HOME/.zshrc"
+            elif [ -n "$BASH_VERSION" ] || [ -f "$HOME/.bashrc" ]; then
+                SHELL_RC="$HOME/.bashrc"
+            else
+                SHELL_RC="$HOME/.profile"
+            fi
+            
+            # Add to PATH if not already there
+            if ! grep -q "export PATH=\"\$HOME/.local/bin:\$PATH\"" "$SHELL_RC" 2>/dev/null; then
+                echo "" >> "$SHELL_RC"
+                echo "# Added by native-launcher installer" >> "$SHELL_RC"
+                echo "export PATH=\"\$HOME/.local/bin:\$PATH\"" >> "$SHELL_RC"
+                log_success "Added to PATH in $SHELL_RC"
+                log_info "Run: source $SHELL_RC (or restart your terminal)"
+            fi
+            
+            # Add to current session
+            export PATH="$HOME/.local/bin:$PATH"
         fi
-        
-        # Add to PATH if not already there
-        if ! grep -q "export PATH=\"\$HOME/.local/bin:\$PATH\"" "$SHELL_RC" 2>/dev/null; then
-            echo "" >> "$SHELL_RC"
-            echo "# Added by native-launcher installer" >> "$SHELL_RC"
-            echo "export PATH=\"\$HOME/.local/bin:\$PATH\"" >> "$SHELL_RC"
-            log_success "Added to PATH in $SHELL_RC"
-            log_info "Run: source $SHELL_RC (or restart your terminal)"
-        fi
-        
-        # Add to current session
-        export PATH="$HOME/.local/bin:$PATH"
     fi
     
     log_success "Installation verified successfully!"
@@ -1558,6 +1733,16 @@ print_completion() {
     echo "  Version: $LATEST_VERSION"
     echo "  Theme: $SELECTED_THEME"
     echo "  Binary: $INSTALL_DIR/native-launcher"
+    
+    # Check and show symlink status
+    if [ -L "$SYMLINK_TARGET" ] && [ -e "$SYMLINK_TARGET" ]; then
+        echo "  Symlink: $SYMLINK_TARGET (active)"
+        echo "  Access: 'native-launcher' available system-wide"
+    else
+        echo "  Symlink: Not created"
+        echo "  Access: Use absolute path or run with --link for system-wide access"
+    fi
+    
     echo "  Config: $CONFIG_DIR/config.toml"
     
     # Show daemon status
@@ -1641,6 +1826,9 @@ main() {
     
     # Setup keybinds (Super+Space)
     setup_keybinds
+    
+    # Create system-wide symlink if requested
+    create_symlink
     
     # Restart daemon if it was running before
     restart_daemon

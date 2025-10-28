@@ -36,14 +36,37 @@
 curl -fsSL https://raw.githubusercontent.com/ArunPrakashG/native-launcher/main/install.sh | bash
 ```
 
+**System-wide installation** (optional - creates symlink for all users):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ArunPrakashG/native-launcher/main/install.sh | bash -s -- --link
+```
+
 The installer will:
 
 - ✅ Backup existing installation (if found)
 - ✅ Detect your system and compositor
 - ✅ Install required dependencies
-- ✅ Download the latest release
+- ✅ Download the latest release to `~/.local/bin`
 - ✅ Let you choose a theme interactively
 - ✅ Configure compositor keybinds (Hyprland/Sway)
+- ✅ Install man page to `~/.local/share/man`
+- ✅ (Optional) Create system-wide symlink with `--link`
+
+### Installation Options
+
+| Option    | Description                                             | Requires Sudo |
+| --------- | ------------------------------------------------------- | ------------- |
+| (default) | Install to `~/.local/bin` with absolute paths in config | No            |
+| `--link`  | Create symlink in `/usr/local/bin` for system-wide use  | Yes (once)    |
+| `--help`  | Show installation help and all available options        | No            |
+
+**Why use `--link`?**
+
+- Makes `native-launcher` available system-wide (all users)
+- Simpler compositor configs (uses `native-launcher` instead of full path)
+- Binary updates don't require sudo (only the initial symlink creation does)
+- Configs automatically updated to use short command name
 
 ## 🎨 Themes
 
@@ -145,18 +168,30 @@ cp target/release/native-launcher ~/.local/bin/
 **Hyprland** (`~/.config/hypr/hyprland.conf`):
 
 ```bash
+# If installed with --link
+bind = SUPER, SPACE, exec, native-launcher
+
+# If installed without --link (default)
 bind = SUPER, SPACE, exec, ~/.local/bin/native-launcher
 ```
 
 **Sway** (`~/.config/sway/config`):
 
 ```bash
+# If installed with --link
+bindsym Mod4+Space exec native-launcher
+
+# If installed without --link (default)
 bindsym Mod4+Space exec ~/.local/bin/native-launcher
 ```
 
 **River** (`~/.config/river/init`):
 
 ```bash
+# If installed with --link
+riverctl map normal Super Space spawn native-launcher
+
+# If installed without --link (default)
 riverctl map normal Super Space spawn ~/.local/bin/native-launcher
 ```
 
@@ -192,6 +227,15 @@ Backups are stored in: `~/.local/share/native-launcher/backups/`
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ArunPrakashG/native-launcher/main/uninstall.sh | bash
 ```
+
+The uninstaller will remove:
+
+- ✅ Binary from `~/.local/bin`
+- ✅ System-wide symlink (if created with `--link`)
+- ✅ Man page from `~/.local/share/man`
+- ✅ Configuration files (with confirmation)
+- ✅ Cache and data (with confirmation)
+- ✅ Compositor keybinds (with confirmation)
 
 </details>
 

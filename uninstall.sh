@@ -12,9 +12,53 @@ NC='\033[0m' # No Color
 
 # Installation paths
 INSTALL_DIR="$HOME/.local/bin"
+SYMLINK_TARGET="/usr/local/bin/native-launcher"
 CONFIG_DIR="$HOME/.config/native-launcher"
 CACHE_DIR="$HOME/.cache/native-launcher"
 DATA_DIR="$HOME/.local/share/native-launcher"
+MAN_PAGE="$HOME/.local/share/man/man1/native-launcher.1"
+
+# Parse command line arguments
+parse_arguments() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --help|-h)
+                show_help
+                exit 0
+                ;;
+            *)
+                log_error "Unknown option: $1"
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+}
+
+# Show help message
+show_help() {
+    cat << EOF
+Native Launcher Uninstall Script
+
+Usage: $0 [OPTIONS]
+
+Options:
+  -h, --help      Show this help message
+
+This script will remove:
+  • Binary from ~/.local/bin
+  • Symlink from /usr/local/bin (if exists, requires sudo)
+  • Configuration files (optional)
+  • Cache files (optional)
+  • Data files (optional)
+  • Man page (if exists)
+  • Compositor keybinds (optional)
+
+Example:
+  $0
+
+EOF
+}
 
 # Logging functions
 log_info() {
@@ -58,10 +102,57 @@ remove_binary() {
     fi
 }
 
+# Remove symlink
+remove_symlink() {
+    if [ -L "$SYMLINK_TARGET" ]; then
+        log_info "Found symlink at $SYMLINK_TARGET"
+        
+        if ! command -v sudo >/dev/null 2>&1; then
+            log_warning "Symlink removal requires sudo, but sudo is not available"
+            log_info "Please manually remove: sudo rm $SYMLINK_TARGET"
+            return 1
+        fi
+        
+        read -p "Remove system-wide symlink? (Y/n) " -n 1 -r < /dev/tty
+        echo
+        if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+            sudo rm "$SYMLINK_TARGET"
+            log_success "Symlink removed"
+        else
+            log_info "Symlink kept at $SYMLINK_TARGET"
+        fi
+    elif [ -f "$SYMLINK_TARGET" ]; then
+        log_warning "Regular file found at $SYMLINK_TARGET (not a symlink)"
+        log_info "This may be a global installation. Skipping removal."
+    else
+        log_info "No symlink found at $SYMLINK_TARGET"
+    fi
+}
+
+# Remove man page
+remove_man_page() {
+    if [ -f "$MAN_PAGE" ]; then
+        read -p "Remove man page? (y/N) " -n 1 -r < /dev/tty
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            rm -f "$MAN_PAGE"
+            # Update man database if available
+            if command -v mandb >/dev/null 2>&1; then
+                mandb -q "$HOME/.local/share/man" 2>/dev/null || true
+            fi
+            log_success "Man page removed"
+        else
+            log_info "Man page kept at $MAN_PAGE"
+        fi
+    else
+        log_info "Man page not found"
+    fi
+}
+
 # Remove configuration
 remove_config() {
     if [ -d "$CONFIG_DIR" ]; then
-        read -p "Remove configuration directory $CONFIG_DIR? (y/N) " -n 1 -r
+        read -p "Remove configuration directory $CONFIG_DIR? (y/N) " -n 1 -r < /dev/tty
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             rm -rf "$CONFIG_DIR"
@@ -77,7 +168,7 @@ remove_config() {
 # Remove cache
 remove_cache() {
     if [ -d "$CACHE_DIR" ]; then
-        read -p "Remove cache directory $CACHE_DIR? (y/N) " -n 1 -r
+        read -p "Remove cache directory $CACHE_DIR? (y/N) " -n 1 -r < /dev/tty
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             rm -rf "$CACHE_DIR"
@@ -93,7 +184,7 @@ remove_cache() {
 # Remove data
 remove_data() {
     if [ -d "$DATA_DIR" ]; then
-        read -p "Remove data directory $DATA_DIR (includes usage statistics)? (y/N) " -n 1 -r
+        read -p "Remove data directory $DATA_DIR (includes usage statistics)? (y/N) " -n 1 -r < /dev/tty
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             rm -rf "$DATA_DIR"
@@ -114,7 +205,7 @@ remove_compositor_keybind() {
     fi
     
     if grep -q "native-launcher" "$COMPOSITOR_CONFIG"; then
-        read -p "Remove native-launcher keybind from $COMPOSITOR? (y/N) " -n 1 -r
+        read -p "Remove native-launcher keybind from $COMPOSITOR? (y/N) " -n 1 -r < /dev/tty
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             # Create backup
@@ -141,8 +232,17 @@ main() {
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
     
+    log_info "Uninstalling Native Launcher"
+    echo ""
+    
+    # Check for symlink
+    if [ -L "$SYMLINK_TARGET" ]; then
+        log_info "System-wide symlink detected at $SYMLINK_TARGET"
+    fi
+    echo ""
+    
     log_warning "This will remove Native Launcher from your system"
-    read -p "Continue with uninstallation? (y/N) " -n 1 -r
+    read -p "Continue with uninstallation? (y/N) " -n 1 -r < /dev/tty
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         log_info "Uninstallation cancelled"
@@ -156,6 +256,8 @@ main() {
     
     # Remove components
     remove_binary
+    remove_symlink
+    remove_man_page
     remove_compositor_keybind
     remove_config
     remove_cache
@@ -171,21 +273,6 @@ main() {
     echo ""
 }
 
-# Handle script arguments
-case "${1:-}" in
-    --help|-h)
-        echo "Native Launcher Uninstall Script"
-        echo ""
-        echo "Usage: $0"
-        echo ""
-        echo "This script will remove Native Launcher and optionally:"
-        echo "  - Configuration files"
-        echo "  - Cache files"
-        echo "  - Usage statistics"
-        echo "  - Compositor keybinds"
-        exit 0
-        ;;
-    *)
-        main
-        ;;
-esac
+# Parse arguments and run main
+parse_arguments "$@"
+main
