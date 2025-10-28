@@ -145,7 +145,7 @@ fn parse_actions(entry: &FdEntry, path: &PathBuf) -> Result<Vec<DesktopAction>> 
 
 **Why**: Spec compliance. Desktop actions enable context menus (right-click actions).
 
-### 3. Modern Launcher Design (Inspired by Raycast)
+### 3. Modern Launcher Design (Inspired by Contemporary Launchers)
 
 ### 3. Design System
 

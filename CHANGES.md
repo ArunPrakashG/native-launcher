@@ -1,11 +1,11 @@
-# Change Summary - Application Launch Fix & Raycast Design
+# Change Summary - Application Launch Fix & Modern Design
 
 ## Overview
 
 This update includes two major improvements:
 
 1. **Fixed Application Launching** - Applications now properly launch and stay running
-2. **Raycast Design Language** - Complete UI redesign to match Raycast's aesthetic
+2. **Modern Design Language** - Complete UI redesign with clean, minimal aesthetic inspired by modern launchers
 
 ## Changes Made
 
@@ -63,7 +63,7 @@ match terminal.as_str() {
 - Error-level for failures
 - Debug-level for detection
 
-### 2. Raycast Design Implementation (`src/ui/style.css`)
+### 2. Modern Design Implementation (`src/ui/style.css`)
 
 #### Complete CSS Rewrite
 
@@ -74,9 +74,9 @@ match terminal.as_str() {
 --primary: rgba(100, 150, 255, 1);
 --bg-primary: rgba(30, 30, 35, 0.95);
 
-/* After: Raycast coral/charcoal */
---raycast-primary: #ff6363;
---raycast-bg-primary: #1c1c1e;
+/* After: Modern coral/charcoal */
+--nl-primary: #ff6363;
+--nl-bg-primary: #1c1c1e;
 ```
 
 **Window Styling**:
@@ -121,11 +121,11 @@ match terminal.as_str() {
 ### Modified Files
 
 1. `src/utils/exec.rs` - Complete rewrite of execution logic
-2. `src/ui/style.css` - Complete redesign with Raycast colors
+2. `src/ui/style.css` - Complete redesign with modern color scheme
 
 ### New Documentation Files
 
-1. `RAYCAST_DESIGN.md` - Design language documentation
+1. `MODERN_DESIGN.md` - Design language documentation
 2. `TESTING.md` - Comprehensive testing guide
 3. `CHANGES.md` - This file
 
@@ -159,7 +159,7 @@ match terminal.as_str() {
 ✅ Applications launch and stay running
 ✅ Launcher closes after launch
 ✅ Terminal apps work correctly
-✅ Visual design matches Raycast aesthetic
+✅ Visual design is clean and modern
 ✅ Animations are fast and responsive
 
 ## Performance Impact
@@ -192,7 +192,7 @@ No action needed - just rebuild and run. The new design and fixes are automatic.
 
 ### For Developers
 
-- CSS variables now use `--raycast-*` prefix
+- CSS variables now use `--nl-*` prefix (native-launcher)
 - Removed animation keyframes (fadeIn, slideIn, pulse)
 - Execution uses `setsid -f` for all launches
 
@@ -215,7 +215,7 @@ None currently. All previous issues resolved:
 
 ## Credits
 
-- **Design Inspiration**: [Raycast](https://www.raycast.com/) - The blazingly fast launcher for macOS
+- **Design Inspiration**: Modern launchers like [Raycast](https://www.raycast.com/), [Albert](https://albertlauncher.github.io/), and macOS Spotlight
 - **Execution Fix**: Linux setsid + proper process detachment
 - **Framework**: GTK4 with Rust bindings
 

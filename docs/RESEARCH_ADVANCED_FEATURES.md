@@ -96,7 +96,7 @@ impl ResultsList {
 
 #### Benefits
 
-- ✅ Cleaner, more focused UI (like Spotlight, Raycast)
+- ✅ Cleaner, more focused UI (like Spotlight, modern launchers)
 - ✅ Reduces visual clutter on launch
 - ✅ Faster perceived startup (no initial search)
 - ✅ Encourages keyboard-driven workflow
