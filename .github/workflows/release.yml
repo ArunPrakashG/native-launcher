@@ -102,7 +102,21 @@ jobs:
             libcairo2-dev \
             libpango1.0-dev \
             libgdk-pixbuf-2.0-dev \
-            libwayland-dev
+            libwayland-dev \
+            meson \
+            ninja-build \
+            valac \
+            gobject-introspection \
+            libgirepository1.0-dev
+
+      - name: Build and install gtk4-layer-shell
+        run: |
+          git clone https://github.com/wmww/gtk4-layer-shell.git
+          cd gtk4-layer-shell
+          meson setup build -Dprefix=/usr
+          meson compile -C build
+          sudo meson install -C build
+          sudo ldconfig
 
       - name: Build release binary
         run: |
@@ -174,7 +188,21 @@ jobs:
             libcairo2-dev \
             libpango1.0-dev \
             libgdk-pixbuf-2.0-dev \
-            libwayland-dev
+            libwayland-dev \
+            meson \
+            ninja-build \
+            valac \
+            gobject-introspection \
+            libgirepository1.0-dev
+
+      - name: Build and install gtk4-layer-shell
+        run: |
+          git clone https://github.com/wmww/gtk4-layer-shell.git
+          cd gtk4-layer-shell
+          meson setup build -Dprefix=/usr
+          meson compile -C build
+          sudo meson install -C build
+          sudo ldconfig
 
       - name: Build for ${{ matrix.target }}
         run: |

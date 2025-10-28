@@ -11062,7 +11062,7 @@ Let me create a summary of what was fixed:
 
 ---
 
-_**User (2025-10-28 14:04Z)**_
+_**User (2025-10-28 14:05Z)**_
 
 Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]
 Hit:2 http://azure.archive.ubuntu.com/ubuntu noble InRelease
@@ -11118,6 +11118,91 @@ Building dependency tree...
 Reading state information...
 E: Unable to locate package gtk4-layer-shell
 
+
+---
+
+_**Assistant (copilot/claude-sonnet-4.5)**_
+
+The GitHub Actions workflow is failing because `gtk4-layer-shell` is not available as an apt package. It's actually a library that needs to be installed differently. Let me fix the workflow: 
+```
+
+```
+Now let's fix the additional targets build section as well: 
+```
+
+```
+Perfect! I've fixed the GitHub Actions workflow by removing the non-existent `gtk4-layer-shell` package and adding `libwayland-dev` instead. The `gtk4-layer-shell` Rust crate will build its own bindings from the GTK4 and Wayland development libraries.
+
+## Summary of Changes:
+
+✅ **Removed**: `gtk4-layer-shell` (doesn't exist as apt package)  
+✅ **Added**: `libwayland-dev` (provides Wayland protocol development files)  
+✅ **Kept**: All other GTK4 dependencies (libgtk-4-dev, libadwaita-1-dev, libglib2.0-dev, etc.)
+
+The `gtk4-layer-shell` Rust crate will automatically build from these system libraries. The workflow should now successfully install dependencies and build the release binary.
+
+---
+
+_**User (2025-10-28 14:11Z)**_
+
+ Compiling scopeguard v1.2.0
+   Compiling lock_api v0.4.14
+   Compiling dirs-sys v0.4.1
+   Compiling crossbeam-deque v0.8.6
+   Compiling dlv-list v0.5.2
+   Compiling idna_adapter v1.2.1
+   Compiling graphene-rs v0.20.10
+   Compiling regex v1.12.2
+   Compiling tracing-core v0.1.34
+   Compiling thiserror-impl v1.0.69
+   Compiling num-traits v0.2.19
+   Compiling concurrent-queue v2.5.0
+   Compiling gtk4-layer-shell-sys v0.3.0
+   Compiling adler2 v2.0.1
+   Compiling parking v2.2.1
+   Compiling rustls v0.23.34
+   Compiling percent-encoding v2.3.2
+   Compiling hashbrown v0.14.5
+   Compiling simd-adler32 v0.3.7
+   Compiling utf8_iter v1.0.4
+   Compiling serde_json v1.0.145
+   Compiling miniz_oxide v0.8.9
+   Compiling ordered-multimap v0.7.3
+   Compiling idna v1.1.0
+   Compiling form_urlencoded v1.2.2
+   Compiling event-listener v5.4.1
+warning: gtk4-layer-shell-sys@0.3.0: 
+error: failed to run custom build command for `gtk4-layer-shell-sys v0.3.0`
+Caused by:
+  process didn't exit successfully: `/home/runner/work/native-launcher/native-launcher/target/release/build/gtk4-layer-shell-sys-83d0797299e37a37/build-script-build` (exit status: 1)
+  --- stdout
+  cargo:rerun-if-changed=/home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gtk4-layer-shell-sys-0.3.0/Cargo.toml
+  cargo:rerun-if-env-changed=GTK4_LAYER_SHELL_0_NO_PKG_CONFIG
+  cargo:rerun-if-env-changed=PKG_CONFIG_x86_64-unknown-linux-gnu
+  cargo:rerun-if-env-changed=PKG_CONFIG_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=HOST_PKG_CONFIG
+  cargo:rerun-if-env-changed=PKG_CONFIG
+  cargo:rerun-if-env-changed=PKG_CONFIG_PATH_x86_64-unknown-linux-gnu
+  cargo:rerun-if-env-changed=PKG_CONFIG_PATH_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=HOST_PKG_CONFIG_PATH
+  cargo:rerun-if-env-changed=PKG_CONFIG_PATH
+  cargo:rerun-if-env-changed=PKG_CONFIG_LIBDIR_x86_64-unknown-linux-gnu
+  cargo:rerun-if-env-changed=PKG_CONFIG_LIBDIR_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=HOST_PKG_CONFIG_LIBDIR
+  cargo:rerun-if-env-changed=PKG_CONFIG_LIBDIR
+  cargo:rerun-if-env-changed=PKG_CONFIG_SYSROOT_DIR_x86_64-unknown-linux-gnu
+  cargo:rerun-if-env-changed=PKG_CONFIG_SYSROOT_DIR_x86_64_unknown_linux_gnu
+  cargo:rerun-if-env-changed=HOST_PKG_CONFIG_SYSROOT_DIR
+  cargo:rerun-if-env-changed=PKG_CONFIG_SYSROOT_DIR
+  cargo:warning=
+  pkg-config exited with status code 1
+  > PKG_CONFIG_ALLOW_SYSTEM_CFLAGS=1 pkg-config --libs --cflags gtk4-layer-shell-0 'gtk4-layer-shell-0 >= 1'
+  The system library `gtk4-layer-shell-0` required by crate `gtk4-layer-shell-sys` was not found.
+  The file `gtk4-layer-shell-0.pc` needs to be installed and the PKG_CONFIG_PATH environment variable must contain its parent directory.
+  The PKG_CONFIG_PATH environment variable is not set.
+  HINT: if you have installed the library, try setting PKG_CONFIG_PATH to the directory containing `gtk4-layer-shell-0.pc`.
+warning: build failed, waiting for other jobs to finish...
+Error: Process completed with exit code 101.
 
 ---
 
