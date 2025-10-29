@@ -1,5 +1,5 @@
 use super::traits::{Plugin, PluginContext, PluginResult};
-use crate::desktop::DesktopEntry;
+use crate::desktop::{DesktopEntry, DesktopEntryArena, SharedDesktopEntry};
 use crate::usage::UsageTracker;
 use anyhow::Result;
 use fuzzy_matcher::skim::SkimMatcherV2;
@@ -7,7 +7,7 @@ use fuzzy_matcher::FuzzyMatcher;
 
 /// Plugin for searching desktop applications
 pub struct ApplicationsPlugin {
-    entries: Vec<DesktopEntry>,
+    entries: DesktopEntryArena,
     matcher: SkimMatcherV2,
     usage_tracker: Option<UsageTracker>,
 }
@@ -23,7 +23,7 @@ impl std::fmt::Debug for ApplicationsPlugin {
 
 impl ApplicationsPlugin {
     /// Create a new applications plugin
-    pub fn new(entries: Vec<DesktopEntry>) -> Self {
+    pub fn new(entries: DesktopEntryArena) -> Self {
         Self {
             entries,
             matcher: SkimMatcherV2::default(),
@@ -32,7 +32,7 @@ impl ApplicationsPlugin {
     }
 
     /// Create with usage tracking
-    pub fn with_usage_tracking(entries: Vec<DesktopEntry>, usage_tracker: UsageTracker) -> Self {
+    pub fn with_usage_tracking(entries: DesktopEntryArena, usage_tracker: UsageTracker) -> Self {
         Self {
             entries,
             matcher: SkimMatcherV2::default(),
@@ -126,7 +126,7 @@ impl Plugin for ApplicationsPlugin {
 
         // If empty query, return most used apps
         if query.is_empty() {
-            let mut results: Vec<&DesktopEntry> = self.entries.iter().collect();
+            let mut results: Vec<_> = self.entries.iter().cloned().collect();
 
             if let Some(tracker) = &self.usage_tracker {
                 results.sort_by(|a, b| {
@@ -145,6 +145,7 @@ impl Plugin for ApplicationsPlugin {
                 .into_iter()
                 .take(context.max_results)
                 .map(|entry| {
+                    let entry = entry.as_ref();
                     PluginResult::new(
                         entry.name.clone(),
                         entry.exec.clone(),
@@ -159,11 +160,11 @@ impl Plugin for ApplicationsPlugin {
         }
 
         // Score entries using fuzzy matching + usage boost
-        let mut results: Vec<(&DesktopEntry, f64)> = self
+        let mut results: Vec<(SharedDesktopEntry, f64)> = self
             .entries
             .iter()
             .filter_map(|entry| {
-                let fuzzy_score = self.calculate_fuzzy_score(entry, &query_lower);
+                let fuzzy_score = self.calculate_fuzzy_score(entry.as_ref(), &query_lower);
 
                 if fuzzy_score > 0 {
                     let final_score = if let Some(tracker) = &self.usage_tracker {
@@ -173,7 +174,7 @@ impl Plugin for ApplicationsPlugin {
                         fuzzy_score as f64
                     };
 
-                    Some((entry, final_score))
+                    Some((entry.clone(), final_score))
                 } else {
                     None
                 }
@@ -181,10 +182,11 @@ impl Plugin for ApplicationsPlugin {
             .collect();
 
         // Sort by score
-        results.sort_by(|a, b| {
-            b.1.partial_cmp(&a.1)
+        results.sort_by(|(entry_a, score_a), (entry_b, score_b)| {
+            score_b
+                .partial_cmp(score_a)
                 .unwrap_or(std::cmp::Ordering::Equal)
-                .then_with(|| a.0.name.cmp(&b.0.name))
+                .then_with(|| entry_a.name.cmp(&entry_b.name))
         });
 
         // Convert to PluginResult
@@ -192,6 +194,7 @@ impl Plugin for ApplicationsPlugin {
             .into_iter()
             .take(context.max_results)
             .map(|(entry, score)| {
+                let entry = entry.as_ref();
                 PluginResult::new(
                     entry.name.clone(),
                     entry.exec.clone(),

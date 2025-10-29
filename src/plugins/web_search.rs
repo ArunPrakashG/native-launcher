@@ -3,6 +3,8 @@ use anyhow::Result;
 use gtk4::gdk::Key;
 use std::collections::HashMap;
 
+use crate::utils::build_open_command;
+
 /// Plugin for quick web searches
 #[derive(Debug)]
 pub struct WebSearchPlugin {
@@ -140,8 +142,7 @@ impl Plugin for WebSearchPlugin {
                 None => return Ok(vec![]),
             };
 
-            // Use xdg-open to open URL in default browser
-            let command = format!("xdg-open '{}'", url);
+            let command = build_open_command(&url);
 
             return Ok(vec![PluginResult::new(
                 format!("Search {} for '{}'", engine, search_term),
@@ -161,7 +162,7 @@ impl Plugin for WebSearchPlugin {
                 urlencoding::encode(clean_query)
             )
         });
-        let command = format!("xdg-open '{}'", url);
+        let command = build_open_command(&url);
 
         Ok(vec![PluginResult::new(
             format!("Search Google for '{}'", clean_query),

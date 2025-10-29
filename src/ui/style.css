@@ -73,7 +73,7 @@ entry:focus {
   transform: scale(1.01);
 }
 
-entry::selection {
+entry selection {
   background-color: var(--nl-primary);
   color: var(--nl-text-primary);
 }
@@ -86,7 +86,6 @@ scrolledwindow {
   margin: 0 16px 16px 16px; /* Consistent 16px margins to match search entry */
   border-radius: var(--nl-radius-large);
   min-height: 400px; /* Keep viewport expanded even when empty */
-  max-height: 400px; /* Prevent expansion beyond this - FIXED SIZE */
   /* Add subtle background and padding for visual consistency */
   background-color: var(--nl-bg-secondary);
   padding: 8px; /* Consistent 8px padding all around */
@@ -295,7 +294,7 @@ listbox row:hover .action-name {
 }
 
 /* Action rows (indented) - more rounded */
-listbox row box[margin-start="24"] {
+listbox row .inline-action-row {
   padding-left: 12px;
   border-left: 3px solid var(--nl-text-quaternary);
   border-radius: 0 var(--nl-radius-tiny) var(--nl-radius-tiny) 0;
@@ -303,15 +302,24 @@ listbox row box[margin-start="24"] {
   transition: all var(--nl-animation-fast) var(--nl-easing);
 }
 
-listbox row:selected box[margin-start="24"] {
+listbox row:selected .inline-action-row {
   border-left-color: rgba(255, 255, 255, 0.9);
   border-left-width: 4px;
   opacity: 1;
 }
 
-listbox row:hover box[margin-start="24"] {
+listbox row:hover .inline-action-row {
   border-left-color: var(--nl-primary);
   border-left-width: 4px;
+}
+
+/* Linked plugin rows that include icons (e.g., workspaces) */
+listbox row .inline-action-with-icon {
+  padding-left: 0;
+}
+
+listbox row .inline-action-with-icon image.workspace-icon {
+  margin-left: 4px;
 }
 
 /* Subtle background gradient for window */
@@ -465,7 +473,7 @@ listbox row:selected {
 
 /* === Loading/Search Progress Indicator === */
 .search-progress {
-  height: 3px;
+  min-height: 3px;
   background: linear-gradient(
     90deg,
     transparent,
@@ -473,7 +481,6 @@ listbox row:selected {
     transparent
   );
   border-radius: 2px;
-  animation: shimmer 1.5s var(--nl-easing) infinite;
   opacity: 0;
   transition: opacity var(--nl-animation-normal) ease;
 }
@@ -481,16 +488,6 @@ listbox row:selected {
 .search-progress.active {
   opacity: 1;
 }
-
-@keyframes shimmer {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(100%);
-  }
-}
-
 /* Enhanced icon animations */
 image {
   transition: transform var(--nl-animation-fast) var(--nl-easing);

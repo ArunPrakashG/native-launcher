@@ -1,3 +1,4 @@
+use crate::desktop::DesktopEntryArena;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -199,14 +200,15 @@ pub fn clear_icon_cache() {
 }
 
 /// Preload icon cache for all desktop entries in background
-pub fn preload_icon_cache(entries: &[crate::desktop::DesktopEntry]) {
+pub fn preload_icon_cache(entries: &DesktopEntryArena) {
     use tracing::info;
 
     info!("Preloading icon cache for {} entries...", entries.len());
     let start = std::time::Instant::now();
     let mut loaded = 0;
 
-    for entry in entries {
+    for entry in entries.iter() {
+        let entry = entry.as_ref();
         if let Some(ref icon) = entry.icon {
             if resolve_icon(icon).is_some() {
                 loaded += 1;

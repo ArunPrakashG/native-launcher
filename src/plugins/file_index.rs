@@ -11,7 +11,7 @@
 /// - Cache TTL: 2 minutes
 use anyhow::{Context, Result};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
@@ -217,7 +217,7 @@ impl FileIndexService {
             .filter_map(|line| {
                 let path = PathBuf::from(line.trim());
                 // Only return existing, accessible files
-                if path.exists() && !Self::is_hidden(&path) {
+                if path.exists() && !Self::is_hidden(&path) && !Self::is_excluded(&path) {
                     Some(path)
                 } else {
                     None
@@ -258,7 +258,7 @@ impl FileIndexService {
             .lines()
             .filter_map(|line| {
                 let path = PathBuf::from(line.trim());
-                if path.exists() {
+                if path.exists() && !Self::is_excluded(&path) {
                     Some(path)
                 } else {
                     None
@@ -303,7 +303,7 @@ impl FileIndexService {
                     }
 
                     let path = PathBuf::from(line.trim());
-                    if path.exists() && !Self::is_hidden(&path) {
+                    if path.exists() && !Self::is_hidden(&path) && !Self::is_excluded(&path) {
                         all_results.push(path);
                     }
                 }
@@ -346,6 +346,65 @@ impl FileIndexService {
             .and_then(|n| n.to_str())
             .map(|n| n.starts_with('.'))
             .unwrap_or(false)
+    }
+
+    /// Check if path should be excluded from global search results
+    fn is_excluded(path: &Path) -> bool {
+        const EXCLUDED_ROOTS: &[&str] = &["/proc", "/sys", "/dev", "/run", "/snap", "/var/cache"];
+
+        for root in EXCLUDED_ROOTS {
+            if path.starts_with(Path::new(root)) {
+                return true;
+            }
+        }
+
+        const EXCLUDED_COMPONENTS: &[&str] = &[
+            ".cache",
+            "cache",
+            "node_modules",
+            ".npm",
+            ".pnpm-store",
+            ".cargo",
+            ".rustup",
+            "__pycache__",
+            ".pytest_cache",
+            ".m2",
+            ".gradle",
+            ".git",
+            ".hg",
+            ".svn",
+            "target",
+            "dist",
+            "build",
+            ".tox",
+            ".venv",
+            "venv",
+        ];
+
+        const EXCLUDED_SUBSTRINGS: &[&str] = &["/.local/share/Trash", "/Trash-"];
+
+        let path_str = path.to_string_lossy();
+        for needle in EXCLUDED_SUBSTRINGS {
+            if path_str.contains(needle) {
+                return true;
+            }
+        }
+
+        for component in path.components() {
+            if let Component::Normal(name) = component {
+                if let Some(name_str) = name.to_str() {
+                    let lower = name_str.to_ascii_lowercase();
+                    if EXCLUDED_COMPONENTS
+                        .iter()
+                        .any(|candidate| lower == *candidate)
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        false
     }
 
     /// Sort results by relevance to query
@@ -668,6 +727,7 @@ impl Default for FileIndexService {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
 
     #[test]
     fn test_backend_detection() {
@@ -741,5 +801,21 @@ mod tests {
         let service = FileIndexService::new();
         let results = service.search("a").unwrap();
         assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_is_excluded_filters_common_dirs() {
+        assert!(FileIndexService::is_excluded(Path::new(
+            "/home/user/.cache/mozilla/cache2/entries/xyz"
+        )));
+        assert!(FileIndexService::is_excluded(Path::new(
+            "/home/user/project/node_modules/react/index.js"
+        )));
+        assert!(FileIndexService::is_excluded(Path::new(
+            "/proc/sys/kernel/random/uuid"
+        )));
+        assert!(!FileIndexService::is_excluded(Path::new(
+            "/home/user/Documents/report.pdf"
+        )));
     }
 }

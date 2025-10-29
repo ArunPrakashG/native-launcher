@@ -5,6 +5,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use tracing::{debug, warn};
 
+use crate::utils::build_open_command;
+
 /// Recent file entry from recently-used.xbel
 #[derive(Debug, Clone)]
 struct RecentFile {
@@ -241,11 +243,13 @@ impl FileBrowserPlugin {
                     600 // Contains match
                 };
 
+                let open_command = build_open_command(path.to_string_lossy());
+
                 results.push(PluginResult {
                     title: display_name,
                     subtitle: Some(subtitle),
                     icon: Some(icon),
-                    command: format!("xdg-open '{}'", path.display()),
+                    command: open_command,
                     terminal: false,
                     score,
                     plugin_name: "files".to_string(),
@@ -370,11 +374,13 @@ impl Plugin for FileBrowserPlugin {
                     550
                 };
 
+                let open_command = build_open_command(file.path.to_string_lossy());
+
                 results.push(PluginResult {
                     title: file.name.clone(),
                     subtitle,
                     icon: Some(icon),
-                    command: format!("xdg-open '{}'", file.path.display()),
+                    command: open_command,
                     terminal: false,
                     score,
                     plugin_name: self.name().to_string(),
@@ -451,11 +457,10 @@ impl Plugin for FileBrowserPlugin {
                         debug!("Found {} files in system index", indexed_files.len());
 
                         for path in indexed_files.iter().take(20) {
+                            let open_command = build_open_command(path.to_string_lossy());
+
                             // Skip if already in results (from recent files)
-                            if results
-                                .iter()
-                                .any(|r| r.command.contains(&path.to_string_lossy().to_string()))
-                            {
+                            if results.iter().any(|r| r.command == open_command.as_str()) {
                                 continue;
                             }
 
@@ -497,7 +502,7 @@ impl Plugin for FileBrowserPlugin {
                                 title: file_name,
                                 subtitle,
                                 icon: Some(icon),
-                                command: format!("xdg-open '{}'", path.display()),
+                                command: open_command,
                                 terminal: false,
                                 score,
                                 plugin_name: self.name().to_string(),

@@ -65,7 +65,8 @@ launch_10 = "Control+0"
 
 [plugins]
 # List of enabled plugins
-enabled = ["applications", "calculator", "shell"]
+enabled = ["applications", "calculator", "shell", "screenshot"]
+# Screenshots save to ~/Pictures/Screenshots by default (created on first use)
 
 [plugins.applications]
 # Show GenericName field from desktop files

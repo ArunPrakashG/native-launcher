@@ -23,7 +23,8 @@
 - 🧮 **Advanced Calculator** - Time, units, currency, timezone conversions
 - 📁 **File Search** - System-wide indexing with plocate/fd/find
 - 🌐 **Web Search** - Instant web search with Ctrl+Enter
-- 🔌 **Plugin System** - Extensible with dynamic plugins
+- � **Quick Screenshots** - Capture screen, window, or area via `@screenshot` / `@ss`
+- �🔌 **Plugin System** - Extensible with dynamic plugins
 - ⌨️ **Keyboard-Driven** - Full keyboard navigation
 - 🪟 **Wayland Native** - Built on gtk4-layer-shell
 - 🔄 **Auto-Updates** - Background update checking
@@ -115,16 +116,23 @@ Choose from 6 beautiful themes during installation:
 
 ### Command Prefixes
 
-| Prefix        | Plugin             | Example                |
-| ------------- | ------------------ | ---------------------- |
-| `@app`        | Applications       | `@app firefox`         |
-| `@cal`        | Calculator         | `@cal 2+2`             |
-| `@convert`    | Unit Conversion    | `@convert 10kg to lbs` |
-| `@time`       | Time/Timezone      | `@time Tokyo`          |
-| `@files`      | File Search        | `@files config`        |
-| `$ or @shell` | Shell Commands     | `$ ls -la`             |
-| `@ssh`        | SSH Connections    | `@ssh server`          |
-| `@code`       | VS Code Workspaces | `@code my-project`     |
+| Prefix                | Plugin             | Example                |
+| --------------------- | ------------------ | ---------------------- |
+| `@app`                | Applications       | `@app firefox`         |
+| `@cal`                | Calculator         | `@cal 2+2`             |
+| `@convert`            | Unit Conversion    | `@convert 10kg to lbs` |
+| `@time`               | Time/Timezone      | `@time Tokyo`          |
+| `@files`              | File Search        | `@files config`        |
+| `$ or @shell`         | Shell Commands     | `$ ls -la`             |
+| `@ssh`                | SSH Connections    | `@ssh server`          |
+| `@code`               | VS Code Workspaces | `@code my-project`     |
+| `@screenshot` / `@ss` | Screenshots        | `@ss window`           |
+
+### Screenshots
+
+- Use `@screenshot` or the short `@ss` prefix to list capture options (full screen, active window, selection)
+- Images are saved to `~/Pictures/Screenshots` (the folder is created automatically)
+- Launcher detects common tools automatically (`grimshot`, `hyprshot`, `gnome-screenshot`, `spectacle`, `maim`, `scrot`, `grim` + `slurp`)
 
 ## 📚 Documentation
 

@@ -1,11 +1,12 @@
-use crate::desktop::DesktopEntry;
+use crate::desktop::{DesktopEntry, DesktopEntryArena, SharedDesktopEntry};
 use crate::usage::UsageTracker;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
 
 /// Search engine for desktop entries with fuzzy matching and usage tracking
 pub struct SearchEngine {
-    entries: Vec<DesktopEntry>,
+    entries: DesktopEntryArena,
+    usage_enabled: bool,
     #[allow(dead_code)]
     matcher: SkimMatcherV2,
     #[allow(dead_code)]
@@ -13,37 +14,55 @@ pub struct SearchEngine {
 }
 
 impl SearchEngine {
-    /// Create a new search engine with the given entries
-    #[allow(dead_code)]
-
-    pub fn new(entries: Vec<DesktopEntry>) -> Self {
+    fn from_parts(
+        entries: DesktopEntryArena,
+        usage_enabled: bool,
+        usage_tracker: Option<UsageTracker>,
+    ) -> Self {
         Self {
             entries,
+            usage_enabled,
             matcher: SkimMatcherV2::default(),
-            usage_tracker: None,
+            usage_tracker,
         }
+    }
+
+    /// Create a new search engine with the given entries
+    #[allow(dead_code)]
+    pub fn new(entries: DesktopEntryArena, usage_enabled: bool) -> Self {
+        Self::from_parts(entries, usage_enabled, None)
     }
 
     /// Create a new search engine with usage tracking enabled
     #[allow(dead_code)]
+    pub fn with_usage_tracking(entries: DesktopEntryArena, usage_tracker: UsageTracker) -> Self {
+        Self::from_parts(entries, true, Some(usage_tracker))
+    }
 
-    pub fn with_usage_tracking(entries: Vec<DesktopEntry>, usage_tracker: UsageTracker) -> Self {
-        Self {
-            entries,
-            matcher: SkimMatcherV2::default(),
-            usage_tracker: Some(usage_tracker),
-        }
+    /// Create a new search engine with usage tracking and explicit usage flag
+    #[allow(dead_code)]
+    pub fn with_usage_tracking_config(
+        entries: DesktopEntryArena,
+        usage_tracker: UsageTracker,
+        usage_enabled: bool,
+    ) -> Self {
+        Self::from_parts(entries, usage_enabled, Some(usage_tracker))
     }
 
     /// Search for entries matching the query with usage-based boosting
     #[allow(dead_code)]
+    pub fn search(&self, query: &str, max_results: usize) -> Vec<SharedDesktopEntry> {
+        let usage_tracker = if self.usage_enabled {
+            self.usage_tracker.as_ref()
+        } else {
+            None
+        };
 
-    pub fn search(&self, query: &str, max_results: usize) -> Vec<&DesktopEntry> {
         if query.is_empty() {
             // When query is empty, sort by usage if available, otherwise by name
-            let mut results: Vec<&DesktopEntry> = self.entries.iter().collect();
+            let mut results: Vec<_> = self.entries.iter().cloned().collect();
 
-            if let Some(tracker) = &self.usage_tracker {
+            if let Some(tracker) = usage_tracker {
                 // Sort by usage score (descending), then by name
                 results.sort_by(|a, b| {
                     let score_a = tracker.get_score(&a.path.to_string_lossy());
@@ -63,17 +82,18 @@ impl SearchEngine {
         let query_lower = query.to_lowercase();
 
         // Score entries using fuzzy matching + usage boost
-        let mut results: Vec<(&DesktopEntry, f64)> = self
+        let mut results: Vec<(SharedDesktopEntry, f64)> = self
             .entries
             .iter()
             .filter(|entry| !entry.no_display) // Filter out hidden entries
             .filter_map(|entry| {
+                let entry_ref = entry.as_ref();
                 // Calculate fuzzy match score
-                let fuzzy_score = self.calculate_fuzzy_score(entry, &query_lower);
+                let fuzzy_score = self.calculate_fuzzy_score(entry_ref, &query_lower);
 
                 if fuzzy_score > 0 {
                     // Apply usage boost if tracking is enabled
-                    let final_score = if let Some(tracker) = &self.usage_tracker {
+                    let final_score = if let Some(tracker) = usage_tracker {
                         let usage_score = tracker.get_score(&entry.path.to_string_lossy());
                         // Boost formula: fuzzy_score * (1 + usage_score * 0.1)
                         // This gives 10% boost per usage point
@@ -82,7 +102,7 @@ impl SearchEngine {
                         fuzzy_score as f64
                     };
 
-                    Some((entry, final_score))
+                    Some((entry.clone(), final_score))
                 } else {
                     None
                 }
@@ -90,10 +110,11 @@ impl SearchEngine {
             .collect();
 
         // Sort by final score (descending), then by name
-        results.sort_by(|a, b| {
-            b.1.partial_cmp(&a.1)
+        results.sort_by(|(entry_a, score_a), (entry_b, score_b)| {
+            score_b
+                .partial_cmp(score_a)
                 .unwrap_or(std::cmp::Ordering::Equal)
-                .then_with(|| a.0.name.cmp(&b.0.name))
+                .then_with(|| entry_a.name.cmp(&entry_b.name))
         });
 
         // Return top results
@@ -167,7 +188,7 @@ impl SearchEngine {
     /// Update the entries in the search engine
     #[allow(dead_code)]
 
-    pub fn update_entries(&mut self, entries: Vec<DesktopEntry>) {
+    pub fn update_entries(&mut self, entries: DesktopEntryArena) {
         self.entries = entries;
     }
 
@@ -182,6 +203,8 @@ impl SearchEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::desktop::DesktopEntryArena;
+    use crate::usage::UsageTracker;
     use std::path::PathBuf;
 
     fn create_test_entry(
@@ -210,7 +233,8 @@ mod tests {
             create_test_entry("Files", Some("File Manager"), vec![]),
         ];
 
-        let engine = SearchEngine::new(entries);
+        let arena = DesktopEntryArena::from_vec(entries);
+        let engine = SearchEngine::new(arena, false);
         let results = engine.search("Firefox", 10);
 
         assert_eq!(results.len(), 1);
@@ -224,7 +248,8 @@ mod tests {
             create_test_entry("Thunderbird", Some("Email Client"), vec![]),
         ];
 
-        let engine = SearchEngine::new(entries);
+        let arena = DesktopEntryArena::from_vec(entries);
+        let engine = SearchEngine::new(arena, false);
         let results = engine.search("fire", 10);
 
         assert!(!results.is_empty());
@@ -238,7 +263,8 @@ mod tests {
             create_test_entry("Files", Some("File Manager"), vec![]),
         ];
 
-        let engine = SearchEngine::new(entries);
+        let arena = DesktopEntryArena::from_vec(entries);
+        let engine = SearchEngine::new(arena, false);
 
         // Test with minor typo
         let results = engine.search("firef", 10);
@@ -254,7 +280,8 @@ mod tests {
             create_test_entry("Firefox", Some("Web Browser"), vec![]),
         ];
 
-        let engine = SearchEngine::new(entries);
+        let arena = DesktopEntryArena::from_vec(entries);
+        let engine = SearchEngine::new(arena, false);
         let results = engine.search("files", 10);
 
         assert!(!results.is_empty());
@@ -269,10 +296,64 @@ mod tests {
             create_test_entry("Firefox", Some("Web Browser"), vec!["web", "internet"]),
         ];
 
-        let engine = SearchEngine::new(entries);
+        let arena = DesktopEntryArena::from_vec(entries);
+        let engine = SearchEngine::new(arena, false);
         let results = engine.search("photo", 10);
 
         assert!(!results.is_empty());
         assert_eq!(results[0].name, "GIMP");
+    }
+
+    #[test]
+    fn test_usage_boost_toggle() {
+        let entries = vec![
+            DesktopEntry {
+                name: "Alpha Editor".to_string(),
+                generic_name: None,
+                exec: "alpha".to_string(),
+                icon: None,
+                categories: vec![],
+                keywords: vec![],
+                terminal: false,
+                path: PathBuf::from("/alpha.desktop"),
+                no_display: false,
+                actions: vec![],
+            },
+            DesktopEntry {
+                name: "Beta Browser".to_string(),
+                generic_name: None,
+                exec: "beta".to_string(),
+                icon: None,
+                categories: vec![],
+                keywords: vec![],
+                terminal: false,
+                path: PathBuf::from("/beta.desktop"),
+                no_display: false,
+                actions: vec![],
+            },
+        ];
+
+        let arena = DesktopEntryArena::from_vec(entries);
+
+        let mut tracker = UsageTracker::new();
+        tracker.record_launch("/beta.desktop");
+        tracker.record_launch("/beta.desktop");
+        let tracker_disabled = tracker.clone();
+
+        let engine_usage_enabled =
+            SearchEngine::with_usage_tracking_config(arena.clone(), tracker, true);
+        let usage_results = engine_usage_enabled.search("", 10);
+        assert_eq!(
+            usage_results.first().map(|entry| entry.name.as_str()),
+            Some("Beta Browser")
+        );
+
+        let engine_usage_disabled =
+            SearchEngine::with_usage_tracking_config(arena, tracker_disabled, false);
+        let non_usage_results = engine_usage_disabled.search("", 10);
+        assert_eq!(
+            non_usage_results.first().map(|entry| entry.name.as_str()),
+            Some("Alpha Editor")
+        );
     }
 }

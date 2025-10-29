@@ -40,9 +40,10 @@ impl AdvancedCalculatorPlugin {
 
         // Pattern: "X <unit> ago" or "X <unit> from now" or "in X <unit>"
         let re_ago =
-            regex::Regex::new(r"(\d+)\s*(second|minute|hour|day|week|month|year)s?\s+ago").ok()?;
+            regex::Regex::new(r"^\s*(\d+)\s*(second|minute|hour|day|week|month|year)s?\s+ago\s*$")
+                .ok()?;
         let re_from_now = regex::Regex::new(
-            r"(in\s+)?(\d+)\s*(second|minute|hour|day|week|month|year)s?(\s+from\s+now)?",
+            r"^\s*(in\s+)?(\d+)\s*(second|minute|hour|day|week|month|year)s?(\s+from\s+now)?\s*$",
         )
         .ok()?;
 

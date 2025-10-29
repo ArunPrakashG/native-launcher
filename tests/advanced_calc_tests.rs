@@ -1,10 +1,12 @@
+use native_launcher::config::Config;
 use native_launcher::plugins::traits::{Plugin, PluginContext};
 use native_launcher::plugins::AdvancedCalculatorPlugin;
 
 #[test]
 fn test_time_ago_query() {
     let plugin = AdvancedCalculatorPlugin::new();
-    let context = PluginContext::new(10);
+    let config = Config::default();
+    let context = PluginContext::new(10, &config);
 
     // Test "1 hour ago"
     let results = plugin
@@ -29,7 +31,8 @@ fn test_time_ago_query() {
 #[test]
 fn test_time_from_now() {
     let plugin = AdvancedCalculatorPlugin::new();
-    let context = PluginContext::new(10);
+    let config = Config::default();
+    let context = PluginContext::new(10, &config);
 
     // Test "in 2 hours"
     let results = plugin
@@ -53,7 +56,8 @@ fn test_time_from_now() {
 #[test]
 fn test_unit_conversions() {
     let plugin = AdvancedCalculatorPlugin::new();
-    let context = PluginContext::new(10);
+    let config = Config::default();
+    let context = PluginContext::new(10, &config);
 
     // Test time unit conversion
     let results = plugin
@@ -63,7 +67,12 @@ fn test_unit_conversions() {
         !results.is_empty(),
         "Should return results for '150 days to years'"
     );
-    assert!(results[0].title.contains("year"), "Should contain 'year'");
+    let title = results[0].title.to_lowercase();
+    assert!(
+        title.contains("year"),
+        "Should contain 'year', got: {}",
+        results[0].title
+    );
 
     // Test distance conversion
     let results = plugin
@@ -102,7 +111,8 @@ fn test_unit_conversions() {
 #[test]
 fn test_currency_conversion() {
     let plugin = AdvancedCalculatorPlugin::new();
-    let context = PluginContext::new(10);
+    let config = Config::default();
+    let context = PluginContext::new(10, &config);
 
     // Test currency conversion
     let results = plugin
@@ -128,7 +138,8 @@ fn test_currency_conversion() {
 #[test]
 fn test_timezone_query() {
     let plugin = AdvancedCalculatorPlugin::new();
-    let context = PluginContext::new(10);
+    let config = Config::default();
+    let context = PluginContext::new(10, &config);
 
     // Test current time in UTC
     let results = plugin

@@ -1,5 +1,5 @@
 use native_launcher::config::Config;
-use native_launcher::desktop::DesktopScanner;
+use native_launcher::desktop::{DesktopEntryArena, DesktopScanner};
 use native_launcher::plugins::PluginManager;
 use native_launcher::usage::UsageTracker;
 use std::time::{Duration, Instant};
@@ -14,9 +14,10 @@ fn test_typing_performance_target() {
 
     let scanner = DesktopScanner::new();
     let entries = scanner.scan().expect("Failed to scan desktop entries");
+    let entry_arena = DesktopEntryArena::from_vec(entries);
     let usage_tracker = UsageTracker::new();
     let config = Config::default();
-    let plugin_manager = PluginManager::new(entries, Some(usage_tracker), &config);
+    let plugin_manager = PluginManager::new(entry_arena, Some(usage_tracker), &config);
 
     // Simulate typing "config.txt" (triggers file index at char 3)
     let query = "config.txt";
@@ -76,9 +77,10 @@ fn test_file_index_cache_performance() {
 
     let scanner = DesktopScanner::new();
     let entries = scanner.scan().expect("Failed to scan desktop entries");
+    let entry_arena = DesktopEntryArena::from_vec(entries);
     let usage_tracker = UsageTracker::new();
     let config = Config::default();
-    let plugin_manager = PluginManager::new(entries, Some(usage_tracker), &config);
+    let plugin_manager = PluginManager::new(entry_arena, Some(usage_tracker), &config);
 
     // First search (cache miss, can be slow)
     let query = "config";
@@ -113,9 +115,10 @@ fn test_short_query_performance() {
 
     let scanner = DesktopScanner::new();
     let entries = scanner.scan().expect("Failed to scan desktop entries");
+    let entry_arena = DesktopEntryArena::from_vec(entries);
     let usage_tracker = UsageTracker::new();
     let config = Config::default();
-    let plugin_manager = PluginManager::new(entries, Some(usage_tracker), &config);
+    let plugin_manager = PluginManager::new(entry_arena, Some(usage_tracker), &config);
 
     let short_queries = vec!["f", "fi", "fir"];
 
@@ -143,9 +146,10 @@ fn test_app_search_performance() {
 
     let scanner = DesktopScanner::new();
     let entries = scanner.scan().expect("Failed to scan desktop entries");
+    let entry_arena = DesktopEntryArena::from_vec(entries);
     let usage_tracker = UsageTracker::new();
     let config = Config::default();
-    let plugin_manager = PluginManager::new(entries, Some(usage_tracker), &config);
+    let plugin_manager = PluginManager::new(entry_arena, Some(usage_tracker), &config);
 
     // Queries that should match apps, not trigger file search
     let app_queries = vec!["firefox", "chrome", "terminal"];
@@ -175,6 +179,7 @@ fn test_file_index_worst_case() {
 
     let scanner = DesktopScanner::new();
     let entries = scanner.scan().expect("Failed to scan desktop entries");
+    let entry_arena = DesktopEntryArena::from_vec(entries);
     let usage_tracker = UsageTracker::new();
     let config = Config::default();
 
@@ -186,7 +191,7 @@ fn test_file_index_worst_case() {
     for query in file_queries {
         // Fresh plugin manager to avoid cache
         let plugin_manager =
-            PluginManager::new(entries.clone(), Some(usage_tracker.clone()), &config);
+            PluginManager::new(entry_arena.clone(), Some(usage_tracker.clone()), &config);
 
         let start = Instant::now();
         let _results = plugin_manager.search(query, 10);
@@ -220,9 +225,10 @@ fn test_file_index_worst_case() {
 fn test_progressive_typing_analysis() {
     let scanner = DesktopScanner::new();
     let entries = scanner.scan().expect("Failed to scan desktop entries");
+    let entry_arena = DesktopEntryArena::from_vec(entries);
     let usage_tracker = UsageTracker::new();
     let config = Config::default();
-    let plugin_manager = PluginManager::new(entries, Some(usage_tracker), &config);
+    let plugin_manager = PluginManager::new(entry_arena, Some(usage_tracker), &config);
 
     let queries = vec![
         ("firefox", "App name"),

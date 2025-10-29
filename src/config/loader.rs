@@ -1,4 +1,5 @@
 use super::Config;
+use crate::utils::exec::{configure_open_handlers, CommandOpenHandler};
 use anyhow::Result;
 use std::fs;
 use std::path::PathBuf;
@@ -15,6 +16,7 @@ impl ConfigLoader {
     pub fn new() -> Self {
         let config_path = Self::default_config_path();
         let config = Config::default();
+        apply_open_handler_config(&config);
 
         Self {
             config_path,
@@ -60,6 +62,8 @@ impl ConfigLoader {
             default
         };
 
+        apply_open_handler_config(&config);
+
         Ok(Self {
             config_path,
             config,
@@ -86,6 +90,7 @@ impl ConfigLoader {
 
         self.config = new_config;
         info!("Config reloaded successfully");
+        apply_open_handler_config(&self.config);
 
         Ok(())
     }
@@ -100,6 +105,7 @@ impl ConfigLoader {
     #[allow(dead_code)]
     pub fn update(&mut self, config: Config) -> Result<()> {
         self.config = config;
+        apply_open_handler_config(&self.config);
         self.save()
     }
 
@@ -130,6 +136,31 @@ impl ConfigLoader {
     }
 }
 
+fn apply_open_handler_config(config: &Config) {
+    let handlers: Vec<CommandOpenHandler> = config
+        .handlers
+        .open
+        .iter()
+        .filter_map(|handler_config| {
+            let command = handler_config.command.trim();
+            if command.is_empty() {
+                warn!("Ignoring open handler with empty command in configuration");
+                return None;
+            }
+
+            let handler = CommandOpenHandler {
+                command: handler_config.command.clone(),
+                args: handler_config.args.clone(),
+                pass_target: handler_config.pass_target,
+            };
+
+            Some(handler)
+        })
+        .collect();
+
+    configure_open_handlers(handlers);
+}
+
 impl Default for ConfigLoader {
     fn default() -> Self {
         Self::new()
@@ -139,11 +170,17 @@ impl Default for ConfigLoader {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::schema::OpenHandlerConfig;
+    use crate::utils::exec::{configure_open_handlers, handler_counts_for_test};
 
     #[test]
     fn test_config_loader_new() {
+        let before = handler_counts_for_test();
         let loader = ConfigLoader::new();
         assert_eq!(loader.config().window.width, 700);
+        let after = handler_counts_for_test();
+        // Creating loader should not introduce config handlers by default
+        assert_eq!(after.1, before.1);
     }
 
     #[test]
@@ -151,5 +188,31 @@ mod tests {
         let path = ConfigLoader::default_config_path();
         assert!(path.to_string_lossy().contains("native-launcher"));
         assert!(path.to_string_lossy().ends_with("config.toml"));
+    }
+
+    #[test]
+    fn apply_open_handler_config_registers_valid_entries() {
+        configure_open_handlers(Vec::new());
+
+        let mut config = Config::default();
+        config.handlers.open.push(OpenHandlerConfig {
+            command: "xdg-open".to_string(),
+            args: vec!["--".to_string()],
+            pass_target: true,
+        });
+        config.handlers.open.push(OpenHandlerConfig {
+            command: "".to_string(), // should be ignored
+            args: vec![],
+            pass_target: true,
+        });
+
+        let before = handler_counts_for_test().1;
+        apply_open_handler_config(&config);
+
+        let after = handler_counts_for_test().1;
+        assert_eq!(after, before + 1);
+
+        // Reset config handlers to avoid leaking state to other tests
+        configure_open_handlers(Vec::new());
     }
 }

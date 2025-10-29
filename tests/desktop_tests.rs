@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use native_launcher::desktop::{DesktopEntry, DesktopScanner};
+    use native_launcher::desktop::{DesktopEntry, DesktopEntryArena, DesktopScanner};
     use native_launcher::search::SearchEngine;
     use std::path::PathBuf;
 
@@ -161,7 +161,8 @@ mod tests {
             create_test_entry("App2", "app2"),
         ];
 
-        let engine = SearchEngine::new(entries);
+        let arena = DesktopEntryArena::from_vec(entries);
+        let engine = SearchEngine::new(arena, false);
         let results = engine.search("", 10);
 
         // Empty query should return all entries
@@ -176,7 +177,8 @@ mod tests {
             create_test_entry("Safari", "safari"),
         ];
 
-        let engine = SearchEngine::new(entries);
+        let arena = DesktopEntryArena::from_vec(entries);
+        let engine = SearchEngine::new(arena, false);
         let results = engine.search("fire", 10);
 
         // Should only return Firefox
@@ -193,7 +195,8 @@ mod tests {
             create_test_entry("App4", "app4"),
         ];
 
-        let engine = SearchEngine::new(entries);
+        let arena = DesktopEntryArena::from_vec(entries);
+        let engine = SearchEngine::new(arena, false);
         let results = engine.search("app", 2);
 
         // Should respect limit
@@ -229,7 +232,8 @@ mod tests {
             },
         ];
 
-        let engine = SearchEngine::new(entries);
+        let arena = DesktopEntryArena::from_vec(entries);
+        let engine = SearchEngine::new(arena, false);
         let results = engine.search("firefox", 10);
 
         // Exact match should come first
@@ -265,7 +269,8 @@ mod tests {
             },
         ];
 
-        let engine = SearchEngine::new(entries);
+        let arena = DesktopEntryArena::from_vec(entries);
+        let engine = SearchEngine::new(arena, false);
         let results = engine.search("app", 10);
 
         // Should only show visible app

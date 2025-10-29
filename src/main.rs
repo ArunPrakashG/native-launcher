@@ -21,7 +21,7 @@ use tracing::{debug, error, info, warn};
 use tracing_subscriber::EnvFilter;
 use ui::{load_theme_with_name, KeyboardHints, LauncherWindow, ResultsList, SearchWidget};
 use usage::UsageTracker;
-use utils::{detect_web_search, execute_command, get_default_browser};
+use utils::{build_open_command, detect_web_search, execute_command, get_default_browser};
 
 const APP_ID: &str = "com.github.native-launcher";
 
@@ -66,13 +66,25 @@ fn run_normal_mode() -> Result<()> {
     let config = config_loader.config().clone();
     info!("Config loaded from {:?}", config_loader.path());
 
-    // Load usage tracking data
-    info!("Loading usage tracking data...");
-    let usage_tracker = UsageTracker::load().unwrap_or_else(|e| {
-        error!("Failed to load usage data: {}, starting fresh", e);
+    let usage_enabled = config.search.usage_ranking;
+    if usage_enabled {
+        info!("Usage-based ranking enabled (config.search.usage_ranking = true)");
+    } else {
+        info!("Usage-based ranking disabled via config");
+    }
+
+    let usage_tracker = if usage_enabled {
+        info!("Loading usage tracking data...");
+        let tracker = UsageTracker::load().unwrap_or_else(|e| {
+            error!("Failed to load usage data: {}, starting fresh", e);
+            UsageTracker::new()
+        });
+        info!("Loaded usage data for {} apps", tracker.app_count());
+        tracker
+    } else {
+        info!("Skipping usage tracking initialization");
         UsageTracker::new()
-    });
-    info!("Loaded usage data for {} apps", usage_tracker.app_count());
+    };
 
     // Check for updates in background (non-blocking)
     if config.updater.check_on_startup {
@@ -83,20 +95,28 @@ fn run_normal_mode() -> Result<()> {
     // Scan for desktop applications
     info!("Scanning for desktop applications...");
     let scanner = DesktopScanner::new();
-    let entries = scanner.scan_cached()?;
-    info!("Found {} applications", entries.len());
+    let raw_entries = scanner.scan_cached()?;
+    info!("Found {} applications", raw_entries.len());
+
+    let entry_arena = desktop::DesktopEntryArena::from_vec(raw_entries);
 
     // Start background icon cache preloading
     info!("Starting icon cache preloading in background...");
-    let entries_for_cache = entries.clone();
+    let entries_for_cache = entry_arena.clone();
     std::thread::spawn(move || {
         utils::icons::preload_icon_cache(&entries_for_cache);
     });
 
     // Create plugin manager with all plugins
     info!("Initializing plugin system...");
+    let usage_tracker_for_plugins = if usage_enabled {
+        Some(usage_tracker.clone())
+    } else {
+        None
+    };
+
     let mut plugin_manager =
-        PluginManager::new(entries.clone(), Some(usage_tracker.clone()), &config);
+        PluginManager::new(entry_arena.clone(), usage_tracker_for_plugins, &config);
 
     // Load dynamic plugins
     info!("Loading dynamic plugins...");
@@ -131,6 +151,7 @@ fn run_normal_mode() -> Result<()> {
             app,
             plugin_manager_clone.clone(),
             usage_tracker_clone.clone(),
+            usage_enabled,
             &config_clone,
             metrics_clone.clone(),
         ) {
@@ -150,6 +171,7 @@ fn build_ui(
     app: &Application,
     plugin_manager: Rc<RefCell<PluginManager>>,
     usage_tracker: Rc<RefCell<UsageTracker>>,
+    usage_enabled: bool,
     config: &config::Config,
     plugin_metrics: Rc<Vec<plugins::PluginMetrics>>,
 ) -> Result<()> {
@@ -404,10 +426,12 @@ fn build_ui(
                     if let Some((exec, terminal)) = results_list.get_selected_command() {
                         info!("Launching: {}", exec);
 
-                        // Track usage
-                        if let Some(path) = results_list.get_selected_path() {
-                            usage_tracker_clone.borrow_mut().record_launch(&path);
-                            info!("Recorded launch for {}", path);
+                        // Track usage when enabled
+                        if usage_enabled {
+                            if let Some(path) = results_list.get_selected_path() {
+                                usage_tracker_clone.borrow_mut().record_launch(&path);
+                                info!("Recorded launch for {}", path);
+                            }
                         }
 
                         // IMPORTANT: Hide window BEFORE launching app
@@ -425,9 +449,9 @@ fn build_ui(
                     // IMPORTANT: Hide window BEFORE opening URL
                     window_clone.close();
 
-                    if let Err(e) =
-                        execute_command(&format!("xdg-open '{}'", url), false, merge_login_env)
-                    {
+                    let open_command = build_open_command(&url);
+
+                    if let Err(e) = execute_command(&open_command, false, merge_login_env) {
                         error!("Failed to open URL: {}", e);
                     }
                 }
@@ -446,6 +470,23 @@ fn build_ui(
                     debug!("Keyboard event handled by plugin");
                 }
             }
+        });
+    }
+
+    // Handle mouse activation (double-click) on results list
+    {
+        let results_list_clone = results_list.clone();
+        let window_clone = launcher_window.window.clone();
+        let usage_tracker_clone = usage_tracker.clone();
+
+        results_list.list.connect_row_activated(move |_, _| {
+            handle_selected_result(
+                &results_list_clone,
+                &window_clone,
+                &usage_tracker_clone,
+                usage_enabled,
+                merge_login_env,
+            );
         });
     }
 
@@ -507,50 +548,13 @@ fn build_ui(
 
                     match action {
                         KeyboardAction::None => {
-                            // No plugin handled it, use default behavior (launch selected item)
-                            if let Some((exec, terminal)) =
-                                results_list_clone.get_selected_command()
-                            {
-                                // Special handling for theme switcher commands
-                                if exec.starts_with("@theme:") {
-                                    if let Some(theme_name) = exec.strip_prefix("@theme:") {
-                                        info!("Switching to theme: {}", theme_name);
-                                        load_theme_with_name(theme_name);
-
-                                        // Persist theme selection to config file
-                                        use config::ConfigLoader;
-                                        if let Ok(mut loader) = ConfigLoader::load() {
-                                            let mut updated_config = loader.config().clone();
-                                            updated_config.ui.theme = theme_name.to_string();
-
-                                            if let Err(e) = loader.update(updated_config) {
-                                                warn!("Failed to persist theme to config: {}", e);
-                                            } else {
-                                                info!("Theme '{}' saved to config", theme_name);
-                                            }
-                                        }
-
-                                        // Don't close window - let user see theme change
-                                        return gtk4::glib::Propagation::Stop;
-                                    }
-                                }
-
-                                info!("Launching: {}", exec);
-
-                                // Track usage
-                                if let Some(path) = results_list_clone.get_selected_path() {
-                                    usage_tracker_clone.borrow_mut().record_launch(&path);
-                                    info!("Recorded launch for {}", path);
-                                }
-
-                                // IMPORTANT: Hide window BEFORE launching app
-                                // This ensures the new app gets focus and appears in foreground
-                                window_clone.close();
-
-                                if let Err(e) = execute_command(&exec, terminal, merge_login_env) {
-                                    error!("Failed to launch {}: {}", exec, e);
-                                }
-                            }
+                            handle_selected_result(
+                                &results_list_clone,
+                                &window_clone,
+                                &usage_tracker_clone,
+                                usage_enabled,
+                                merge_login_env,
+                            );
                         }
                         KeyboardAction::OpenUrl(url) => {
                             info!("Opening URL from plugin: {}", url);
@@ -558,11 +562,9 @@ fn build_ui(
                             // IMPORTANT: Hide window BEFORE opening URL
                             window_clone.close();
 
-                            if let Err(e) = execute_command(
-                                &format!("xdg-open '{}'", url),
-                                false,
-                                merge_login_env,
-                            ) {
+                            let open_command = build_open_command(&url);
+
+                            if let Err(e) = execute_command(&open_command, false, merge_login_env) {
                                 error!("Failed to open URL: {}", e);
                             }
                         }
@@ -618,6 +620,56 @@ fn build_ui(
     Ok(())
 }
 
+fn handle_selected_result(
+    results_list: &ResultsList,
+    window: &gtk4::ApplicationWindow,
+    usage_tracker: &Rc<RefCell<UsageTracker>>,
+    usage_enabled: bool,
+    merge_login_env: bool,
+) -> bool {
+    if let Some((exec, terminal)) = results_list.get_selected_command() {
+        if let Some(theme_name) = exec.strip_prefix("@theme:") {
+            info!("Switching to theme: {}", theme_name);
+            load_theme_with_name(theme_name);
+
+            match ConfigLoader::load() {
+                Ok(mut loader) => {
+                    let mut updated_config = loader.config().clone();
+                    updated_config.ui.theme = theme_name.to_string();
+
+                    if let Err(e) = loader.update(updated_config) {
+                        warn!("Failed to persist theme to config: {}", e);
+                    } else {
+                        info!("Theme '{}' saved to config", theme_name);
+                    }
+                }
+                Err(e) => warn!("Failed to load config to persist theme: {}", e),
+            }
+
+            return true;
+        }
+
+        info!("Launching: {}", exec);
+
+        if usage_enabled {
+            if let Some(path) = results_list.get_selected_path() {
+                usage_tracker.borrow_mut().record_launch(&path);
+                info!("Recorded launch for {}", path);
+            }
+        }
+
+        window.close();
+
+        if let Err(e) = execute_command(&exec, terminal, merge_login_env) {
+            error!("Failed to launch {}: {}", exec, e);
+        }
+
+        return true;
+    }
+
+    false
+}
+
 fn run_daemon_mode() -> Result<()> {
     info!("Initializing daemon mode");
 
@@ -630,31 +682,50 @@ fn run_daemon_mode() -> Result<()> {
     let config = config_loader.config().clone();
     info!("Config loaded from {:?}", config_loader.path());
 
-    // Load usage tracking data
-    info!("Loading usage tracking data...");
-    let usage_tracker = UsageTracker::load().unwrap_or_else(|e| {
-        error!("Failed to load usage data: {}, starting fresh", e);
+    let usage_enabled = config.search.usage_ranking;
+    if usage_enabled {
+        info!("Usage-based ranking enabled (config.search.usage_ranking = true)");
+    } else {
+        info!("Usage-based ranking disabled via config");
+    }
+
+    let usage_tracker = if usage_enabled {
+        info!("Loading usage tracking data...");
+        let tracker = UsageTracker::load().unwrap_or_else(|e| {
+            error!("Failed to load usage data: {}, starting fresh", e);
+            UsageTracker::new()
+        });
+        info!("Loaded usage data for {} apps", tracker.app_count());
+        tracker
+    } else {
+        info!("Skipping usage tracking initialization");
         UsageTracker::new()
-    });
-    info!("Loaded usage data for {} apps", usage_tracker.app_count());
+    };
 
     // Scan for desktop applications
     info!("Scanning for desktop applications...");
     let scanner = DesktopScanner::new();
-    let entries = scanner.scan_cached()?;
-    info!("Found {} applications", entries.len());
+    let raw_entries = scanner.scan_cached()?;
+    info!("Found {} applications", raw_entries.len());
+
+    let entry_arena = desktop::DesktopEntryArena::from_vec(raw_entries);
 
     // Start background icon cache preloading
     info!("Starting icon cache preloading in background...");
-    let entries_for_cache = entries.clone();
+    let entries_for_cache = entry_arena.clone();
     std::thread::spawn(move || {
         utils::icons::preload_icon_cache(&entries_for_cache);
     });
 
     // Create plugin manager with all plugins
     info!("Initializing plugin system...");
+    let usage_tracker_for_plugins = if usage_enabled {
+        Some(usage_tracker.clone())
+    } else {
+        None
+    };
     let mut plugin_manager =
-        PluginManager::new(entries.clone(), Some(usage_tracker.clone()), &config);
+        PluginManager::new(entry_arena.clone(), usage_tracker_for_plugins, &config);
 
     // Load dynamic plugins
     info!("Loading dynamic plugins...");
@@ -745,6 +816,7 @@ fn run_daemon_mode() -> Result<()> {
             app,
             plugin_manager_clone.clone(),
             usage_tracker_clone.clone(),
+            usage_enabled,
             &config_clone,
             metrics_clone.clone(),
         ) {

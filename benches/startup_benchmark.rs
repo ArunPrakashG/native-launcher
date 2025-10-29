@@ -1,6 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use native_launcher::config::ConfigLoader;
-use native_launcher::desktop::DesktopScanner;
+use native_launcher::desktop::{DesktopEntryArena, DesktopScanner};
 use native_launcher::plugins::PluginManager;
 use native_launcher::usage::UsageTracker;
 use std::time::Duration;
@@ -31,7 +31,8 @@ fn bench_full_startup(c: &mut Criterion) {
         b.iter(|| {
             let scanner = DesktopScanner::new();
             let entries = scanner.scan_cached().expect("Failed to scan");
-            black_box(entries);
+            let entry_arena = DesktopEntryArena::from_vec(entries);
+            black_box(entry_arena);
         });
     });
 
@@ -47,10 +48,11 @@ fn bench_full_startup(c: &mut Criterion) {
             // Desktop scanning
             let scanner = DesktopScanner::new();
             let entries = scanner.scan_cached().expect("Failed to scan");
+            let entry_arena = DesktopEntryArena::from_vec(entries);
 
             // Plugin manager creation
             let plugin_manager =
-                PluginManager::new(entries.clone(), Some(usage_tracker.clone()), &config);
+                PluginManager::new(entry_arena.clone(), Some(usage_tracker.clone()), &config);
 
             // Load dynamic plugins
             let (dynamic_plugins, _metrics) = native_launcher::plugins::load_plugins();
@@ -58,7 +60,7 @@ fn bench_full_startup(c: &mut Criterion) {
             black_box((
                 config,
                 usage_tracker,
-                entries,
+                entry_arena,
                 plugin_manager,
                 dynamic_plugins,
             ));
@@ -75,6 +77,7 @@ fn bench_plugin_initialization(c: &mut Criterion) {
     // Load test data once
     let scanner = DesktopScanner::new();
     let entries = scanner.scan_cached().expect("Failed to scan");
+    let entry_arena = DesktopEntryArena::from_vec(entries);
     let usage_tracker = UsageTracker::load().unwrap_or_else(|_| UsageTracker::new());
     let config_loader = ConfigLoader::load().unwrap_or_else(|_| ConfigLoader::new());
     let config = config_loader.config().clone();
@@ -82,7 +85,7 @@ fn bench_plugin_initialization(c: &mut Criterion) {
     group.bench_function("plugin_manager_creation", |b| {
         b.iter(|| {
             let plugin_manager =
-                PluginManager::new(entries.clone(), Some(usage_tracker.clone()), &config);
+                PluginManager::new(entry_arena.clone(), Some(usage_tracker.clone()), &config);
             black_box(plugin_manager);
         });
     });

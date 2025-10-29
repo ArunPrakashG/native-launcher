@@ -2,15 +2,22 @@ use super::traits::{Plugin, PluginContext, PluginResult};
 use super::LauncherPlugin;
 use super::{
     AdvancedCalculatorPlugin, ApplicationsPlugin, CalculatorPlugin, EditorsPlugin,
-    FileBrowserPlugin, ShellPlugin, SshPlugin, ThemeSwitcherPlugin, WebSearchPlugin,
+    FileBrowserPlugin, ScreenshotPlugin, ShellPlugin, SshPlugin, ThemeSwitcherPlugin,
+    WebSearchPlugin,
 };
 use crate::config::Config;
-use crate::desktop::DesktopEntry;
+use crate::desktop::DesktopEntryArena;
 use crate::usage::UsageTracker;
+use crate::utils::exec::{register_open_handler, CommandOpenHandler, OpenHandlerPriority};
 use anyhow::Result;
+use dirs::home_dir;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 use std::time::{Duration, Instant};
+use tracing::debug;
+use urlencoding::decode;
 
 /// Performance metrics for a plugin
 #[derive(Debug, Clone)]
@@ -40,6 +47,73 @@ impl PluginMetrics {
     }
 }
 
+fn ensure_builtin_open_handlers_registered() {
+    static REGISTERED: OnceLock<()> = OnceLock::new();
+    REGISTERED.get_or_init(|| {
+        register_filesystem_open_handler();
+    });
+}
+
+fn register_filesystem_open_handler() {
+    let handler = CommandOpenHandler {
+        command: "xdg-open".to_string(),
+        args: Vec::new(),
+        pass_target: true,
+    };
+
+    register_open_handler(
+        "filesystem-open",
+        OpenHandlerPriority::Last,
+        move |target, merge_login_env| {
+            if let Some(path) = resolve_filesystem_path(target) {
+                if path.exists() {
+                    debug!("filesystem open handler launching {}", path.display());
+                    let path_string = path.to_string_lossy().to_string();
+                    return handler.execute(&path_string, merge_login_env);
+                }
+            }
+
+            Ok(false)
+        },
+    );
+}
+
+fn resolve_filesystem_path(target: &str) -> Option<PathBuf> {
+    let trimmed = target.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
+        return None;
+    }
+
+    if let Some(stripped) = trimmed.strip_prefix("file://") {
+        if let Ok(decoded) = decode(stripped) {
+            return Some(PathBuf::from(decoded.into_owned()));
+        }
+
+        return Some(PathBuf::from(stripped));
+    }
+
+    if trimmed.starts_with("~/") {
+        if let Some(home) = home_dir() {
+            return Some(home.join(&trimmed[2..]));
+        }
+        return None;
+    }
+
+    if trimmed == "~" {
+        return home_dir();
+    }
+
+    if Path::new(trimmed).is_absolute() {
+        return Some(PathBuf::from(trimmed));
+    }
+
+    None
+}
+
 /// Manages all plugins and coordinates search across them
 pub struct PluginManager {
     plugins: Vec<Box<dyn Plugin>>,
@@ -50,18 +124,24 @@ pub struct PluginManager {
 impl PluginManager {
     /// Create a new plugin manager with default plugins
     pub fn new(
-        entries: Vec<DesktopEntry>,
+        entry_arena: DesktopEntryArena,
         usage_tracker: Option<UsageTracker>,
         config: &Config,
     ) -> Self {
+        ensure_builtin_open_handlers_registered();
+
+        let usage_tracker = if config.search.usage_ranking {
+            usage_tracker
+        } else {
+            None
+        };
+
         let mut plugins: Vec<Box<dyn Plugin>> = Vec::new();
 
         // Applications plugin (always enabled, highest priority)
-        let apps_plugin = if let Some(tracker) = usage_tracker {
-            ApplicationsPlugin::with_usage_tracking(entries.clone(), tracker)
-        } else {
-            ApplicationsPlugin::new(entries.clone())
-        };
+        let apps_plugin = usage_tracker
+            .map(|tracker| ApplicationsPlugin::with_usage_tracking(entry_arena.clone(), tracker))
+            .unwrap_or_else(|| ApplicationsPlugin::new(entry_arena.clone()));
         plugins.push(Box::new(apps_plugin));
 
         // Calculator plugin (basic math)
@@ -104,6 +184,11 @@ impl PluginManager {
         // SSH plugin
         if config.plugins.ssh {
             plugins.push(Box::new(SshPlugin::new(true)));
+        }
+
+        // Screenshot plugin
+        if config.plugins.screenshot {
+            plugins.push(Box::new(ScreenshotPlugin::new()));
         }
 
         // Theme switcher plugin (always enabled)
@@ -379,11 +464,18 @@ impl PluginManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::desktop::DesktopEntry;
+    use crate::desktop::{DesktopEntry, DesktopEntryArena};
+    use crate::utils::exec::{handler_counts_for_test, reset_open_handlers_for_test};
     use std::path::PathBuf;
+    use urlencoding::encode;
 
     fn create_test_config() -> Config {
         Config::default()
+    }
+
+    fn reset_handlers_to_builtin() {
+        reset_open_handlers_for_test();
+        super::register_filesystem_open_handler();
     }
 
     fn create_test_entry(name: &str) -> DesktopEntry {
@@ -403,36 +495,96 @@ mod tests {
 
     #[test]
     fn test_plugin_manager_creation() {
+        reset_handlers_to_builtin();
         let entries = vec![create_test_entry("Firefox")];
+        let arena = DesktopEntryArena::from_vec(entries);
         let config = create_test_config();
-        let manager = PluginManager::new(entries, None, &config);
+        let manager = PluginManager::new(arena, None, &config);
 
         let enabled = manager.enabled_plugins();
         assert!(enabled.contains(&"applications"));
         assert!(enabled.contains(&"calculator"));
         assert!(enabled.contains(&"shell"));
         assert!(enabled.contains(&"web_search"));
+        assert!(enabled.contains(&"screenshot"));
+        // Filesystem open handler should be registered exactly once
+        assert_eq!(handler_counts_for_test(), (1, 0));
+        reset_handlers_to_builtin();
     }
 
     #[test]
     fn test_calculator_search() {
-        let entries = vec![];
+        reset_handlers_to_builtin();
+        let entries = Vec::new();
+        let arena = DesktopEntryArena::from_vec(entries);
         let config = create_test_config();
-        let manager = PluginManager::new(entries, None, &config);
+        let manager = PluginManager::new(arena, None, &config);
 
         let results = manager.search("2+2", 10).unwrap();
         assert!(!results.is_empty());
         assert_eq!(results[0].title, "4");
+        reset_handlers_to_builtin();
     }
 
     #[test]
     fn test_shell_search() {
-        let entries = vec![];
+        reset_handlers_to_builtin();
+        let entries = Vec::new();
+        let arena = DesktopEntryArena::from_vec(entries);
         let config = create_test_config();
-        let manager = PluginManager::new(entries, None, &config);
+        let manager = PluginManager::new(arena, None, &config);
 
         let results = manager.search(">ls -la", 10).unwrap();
         assert!(!results.is_empty());
         assert!(results[0].title.contains("ls -la"));
+        reset_handlers_to_builtin();
+    }
+
+    #[test]
+    fn registers_filesystem_handler_once() {
+        reset_handlers_to_builtin();
+
+        let arena = DesktopEntryArena::from_vec(Vec::new());
+        let config = Config::default();
+        let _manager = PluginManager::new(arena, None, &config);
+        assert_eq!(handler_counts_for_test(), (1, 0));
+
+        // Creating another manager should not add duplicates
+        let arena2 = DesktopEntryArena::from_vec(Vec::new());
+        let _manager2 = PluginManager::new(arena2, None, &config);
+        assert_eq!(handler_counts_for_test(), (1, 0));
+
+        reset_handlers_to_builtin();
+    }
+
+    #[test]
+    fn resolve_filesystem_path_covers_common_inputs() {
+        // Absolute path
+        let abs = std::env::temp_dir().join("launcher-open-test");
+        let abs_str = abs.to_string_lossy().to_string();
+        assert_eq!(resolve_filesystem_path(&abs_str).unwrap(), abs);
+
+        // file:// scheme with encoding
+        let encoded = format!("file://{}", encode(&abs_str).into_owned());
+        assert_eq!(resolve_filesystem_path(&encoded).unwrap(), abs);
+
+        // file:// without encoding
+        let plain_scheme = format!("file://{}", abs_str);
+        assert_eq!(resolve_filesystem_path(&plain_scheme).unwrap(), abs);
+
+        // Tilde expansion
+        if let Some(home) = dirs::home_dir() {
+            assert_eq!(resolve_filesystem_path("~").unwrap(), home);
+            let tilde_path = resolve_filesystem_path("~/Documents");
+            if tilde_path.is_some() {
+                assert!(tilde_path.unwrap().starts_with(&home));
+            }
+        }
+
+        // URLs should not resolve
+        assert!(resolve_filesystem_path("https://example.com").is_none());
+
+        // Relative paths without scheme should be ignored
+        assert!(resolve_filesystem_path("relative/path").is_none());
     }
 }

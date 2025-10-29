@@ -1,6 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use native_launcher::config::Config;
-use native_launcher::desktop::DesktopScanner;
+use native_launcher::desktop::{DesktopEntryArena, DesktopScanner};
 use native_launcher::plugins::PluginManager;
 use native_launcher::usage::UsageTracker;
 use std::time::Instant;
@@ -32,9 +32,10 @@ fn typing_latency_benchmark(c: &mut Criterion) {
     // Setup plugin manager (expensive, do once)
     let scanner = DesktopScanner::new();
     let entries = scanner.scan().unwrap_or_default();
+    let entry_arena = DesktopEntryArena::from_vec(entries);
     let usage_tracker = UsageTracker::new();
     let config = Config::default();
-    let plugin_manager = PluginManager::new(entries, Some(usage_tracker), &config);
+    let plugin_manager = PluginManager::new(entry_arena, Some(usage_tracker), &config);
 
     let mut group = c.benchmark_group("typing_latency");
     group.sample_size(20); // Reduce samples since this is expensive
@@ -72,9 +73,10 @@ fn typing_latency_benchmark(c: &mut Criterion) {
 fn keystroke_latency_benchmark(c: &mut Criterion) {
     let scanner = DesktopScanner::new();
     let entries = scanner.scan().unwrap_or_default();
+    let entry_arena = DesktopEntryArena::from_vec(entries);
     let usage_tracker = UsageTracker::new();
     let config = Config::default();
-    let plugin_manager = PluginManager::new(entries, Some(usage_tracker), &config);
+    let plugin_manager = PluginManager::new(entry_arena, Some(usage_tracker), &config);
 
     let mut group = c.benchmark_group("keystroke_latency");
 
@@ -102,9 +104,10 @@ fn keystroke_latency_benchmark(c: &mut Criterion) {
 fn file_index_benchmark(c: &mut Criterion) {
     let scanner = DesktopScanner::new();
     let entries = scanner.scan().unwrap_or_default();
+    let entry_arena = DesktopEntryArena::from_vec(entries);
     let usage_tracker = UsageTracker::new();
     let config = Config::default();
-    let plugin_manager = PluginManager::new(entries, Some(usage_tracker), &config);
+    let plugin_manager = PluginManager::new(entry_arena, Some(usage_tracker), &config);
 
     let mut group = c.benchmark_group("file_index_search");
 
@@ -126,9 +129,10 @@ fn file_index_benchmark(c: &mut Criterion) {
 fn app_search_benchmark(c: &mut Criterion) {
     let scanner = DesktopScanner::new();
     let entries = scanner.scan().unwrap_or_default();
+    let entry_arena = DesktopEntryArena::from_vec(entries);
     let usage_tracker = UsageTracker::new();
     let config = Config::default();
-    let plugin_manager = PluginManager::new(entries, Some(usage_tracker), &config);
+    let plugin_manager = PluginManager::new(entry_arena, Some(usage_tracker), &config);
 
     let mut group = c.benchmark_group("app_search");
 
@@ -152,6 +156,7 @@ fn cache_miss_benchmark(c: &mut Criterion) {
 
     let scanner = DesktopScanner::new();
     let entries = scanner.scan().unwrap_or_default();
+    let entry_arena = DesktopEntryArena::from_vec(entries);
     let usage_tracker = UsageTracker::new();
     let config = Config::default();
 
@@ -161,7 +166,7 @@ fn cache_miss_benchmark(c: &mut Criterion) {
         b.iter(|| {
             // Create fresh plugin manager each time to simulate cache miss
             let plugin_manager =
-                PluginManager::new(entries.clone(), Some(usage_tracker.clone()), &config);
+                PluginManager::new(entry_arena.clone(), Some(usage_tracker.clone()), &config);
 
             // Use different query each time to avoid cache hits
             let n = counter.fetch_add(1, Ordering::Relaxed);

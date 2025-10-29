@@ -11,6 +11,7 @@ pub struct Config {
     pub plugins: PluginsConfig,
     pub updater: UpdaterConfig,
     pub environment: EnvironmentConfig,
+    pub handlers: HandlersConfig,
 }
 
 /// Window configuration
@@ -109,6 +110,8 @@ pub struct PluginsConfig {
     pub files: bool,
     /// Enable launcher (self-update) plugin
     pub launcher: bool,
+    /// Enable screenshot plugin
+    pub screenshot: bool,
     /// Shell command prefix (default: ">")
     pub shell_prefix: String,
 }
@@ -123,6 +126,7 @@ impl Default for PluginsConfig {
             editors: true,
             files: true,
             launcher: true,
+            screenshot: true,
             shell_prefix: ">".to_string(),
         }
     }
@@ -163,6 +167,42 @@ impl Default for EnvironmentConfig {
     }
 }
 
+/// Handler configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct HandlersConfig {
+    /// Custom open handlers configured by the user
+    pub open: Vec<OpenHandlerConfig>,
+}
+
+impl Default for HandlersConfig {
+    fn default() -> Self {
+        Self { open: Vec::new() }
+    }
+}
+
+/// Command-based open handler configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct OpenHandlerConfig {
+    /// Command to execute
+    pub command: String,
+    /// Arguments to pass before the target. Use `{target}` placeholder to inject the target inline.
+    pub args: Vec<String>,
+    /// Whether to append the target automatically when `{target}` placeholder is absent
+    pub pass_target: bool,
+}
+
+impl Default for OpenHandlerConfig {
+    fn default() -> Self {
+        Self {
+            command: String::new(),
+            args: Vec::new(),
+            pass_target: true,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -174,6 +214,8 @@ mod tests {
         assert_eq!(config.search.max_results, 10);
         assert_eq!(config.ui.icon_size, 48);
         assert!(!config.environment.merge_login_env);
+        assert!(config.handlers.open.is_empty());
+        assert!(config.plugins.screenshot);
     }
 
     #[test]

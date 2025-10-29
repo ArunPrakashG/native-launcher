@@ -7,6 +7,7 @@ pub mod file_index;
 pub mod files;
 pub mod launcher;
 pub mod manager;
+pub mod screenshot;
 #[allow(dead_code)] // Complete but not yet integrated - see docs/SCRIPT_PLUGIN_SYSTEM.md
 pub mod script_plugin;
 pub mod shell;
@@ -25,6 +26,7 @@ pub use launcher::LauncherPlugin;
 pub use manager::PluginManager;
 // Script plugin system is complete but not integrated yet - uncomment when ready to use
 // pub use script_plugin::{ScriptPlugin, ScriptPluginManager};
+pub use screenshot::ScreenshotPlugin;
 pub use shell::ShellPlugin;
 pub use ssh::SshPlugin;
 pub use theme_switcher::ThemeSwitcherPlugin;

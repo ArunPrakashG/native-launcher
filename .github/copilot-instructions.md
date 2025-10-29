@@ -61,7 +61,7 @@ utils/           → Execute commands, icon loading
 
 ### Data Flow
 
-1. **Startup**: `DesktopScanner::scan()` → parses all .desktop files → `SearchEngine::new(entries)`
+1. **Startup**: `DesktopScanner::scan()` → parses all .desktop files → `SearchEngine::new(entries, usage_enabled)`
 2. **Search**: User types → `search_widget.entry.connect_changed()` → `SearchEngine::search()` → `results_list.update_results()`
 3. **Launch**: Enter key → `results_list.get_selected_command()` → `execute_command(exec, terminal)`
 
@@ -122,7 +122,8 @@ GTK signals require `'static` lifetime. We use `Rc<RefCell<T>>` for shared mutab
 
 ```rust
 // src/main.rs
-let search_engine = Rc::new(RefCell::new(SearchEngine::new(entries)));
+let usage_enabled = true; // derive from config when wiring up the UI
+let search_engine = Rc::new(RefCell::new(SearchEngine::new(entries, usage_enabled)));
 search_widget.entry.connect_changed(move |entry| {
     let results = search_engine.borrow().search(&query, 10);
     // ...

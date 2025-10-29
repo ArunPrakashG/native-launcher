@@ -9,7 +9,7 @@ use std::sync::Once;
 
 // Import from main crate
 use native_launcher::config::{Config, ConfigLoader};
-use native_launcher::desktop::{DesktopEntry, DesktopScanner};
+use native_launcher::desktop::{DesktopEntry, DesktopEntryArena, DesktopScanner};
 use native_launcher::plugins::{KeyboardAction, KeyboardEvent, PluginManager};
 use native_launcher::search::SearchEngine;
 use native_launcher::ui::{ResultsList, SearchWidget};
@@ -65,7 +65,8 @@ fn test_e2e_desktop_scanner_to_search_engine() {
         );
 
         // 2. Create search engine
-        let search_engine = SearchEngine::new(entries.clone());
+        let entry_arena = DesktopEntryArena::from_vec(entries.clone());
+        let search_engine = SearchEngine::new(entry_arena, false);
 
         // 3. Perform search
         let firefox_results = search_engine.search("firefox", 10);
@@ -171,6 +172,7 @@ fn test_e2e_plugin_manager_integration() {
         // Scan desktop apps
         let scanner = DesktopScanner::new();
         let entries = scanner.scan().expect("Failed to scan");
+        let entry_arena = DesktopEntryArena::from_vec(entries.clone());
 
         // Create usage tracker
         let usage_tracker = UsageTracker::new();
@@ -179,7 +181,7 @@ fn test_e2e_plugin_manager_integration() {
         let config = Config::default();
 
         // Create plugin manager
-        let plugin_manager = PluginManager::new(entries.clone(), Some(usage_tracker), &config);
+        let plugin_manager = PluginManager::new(entry_arena, Some(usage_tracker), &config);
 
         // Test search with no query (should show apps)
         let results = plugin_manager.search("", 10).expect("Search failed");
@@ -262,7 +264,8 @@ fn test_e2e_search_widget_to_results_list() {
 
         // Create plugin manager for results
         let config = Config::default();
-        let plugin_manager = Rc::new(RefCell::new(PluginManager::new(entries, None, &config)));
+        let entry_arena = DesktopEntryArena::from_vec(entries);
+        let plugin_manager = Rc::new(RefCell::new(PluginManager::new(entry_arena, None, &config)));
 
         // Connect search widget to results list
         let results_list_clone = results_list.clone();
@@ -311,7 +314,8 @@ fn test_e2e_keyboard_event_handling() {
         let scanner = DesktopScanner::new();
         let entries = scanner.scan().unwrap_or_default();
         let config = Config::default();
-        let plugin_manager = PluginManager::new(entries, None, &config);
+        let entry_arena = DesktopEntryArena::from_vec(entries);
+        let plugin_manager = PluginManager::new(entry_arena, None, &config);
 
         // Test 1: Ctrl+Enter with web search query
         let keyboard_event = KeyboardEvent::new(
@@ -366,7 +370,8 @@ fn test_e2e_multi_plugin_search() {
         let scanner = DesktopScanner::new();
         let entries = scanner.scan().unwrap_or_default();
         let config = Config::default();
-        let plugin_manager = PluginManager::new(entries.clone(), None, &config);
+        let entry_arena = DesktopEntryArena::from_vec(entries);
+        let plugin_manager = PluginManager::new(entry_arena, None, &config);
 
         // Query that matches multiple plugins: "code"
         // - Applications: VS Code, VS Codium, etc.
@@ -402,7 +407,8 @@ fn test_e2e_fuzzy_search_accuracy() {
         let scanner = DesktopScanner::new();
         let entries = scanner.scan().unwrap_or_default();
         let config = Config::default();
-        let plugin_manager = PluginManager::new(entries.clone(), None, &config);
+        let entry_arena = DesktopEntryArena::from_vec(entries.clone());
+        let plugin_manager = PluginManager::new(entry_arena, None, &config);
 
         // Test fuzzy matching with typos
         let test_cases = vec![
@@ -447,10 +453,11 @@ fn test_e2e_plugin_performance() {
         let scanner = DesktopScanner::new();
         let entries = scanner.scan().unwrap_or_default();
         let config = Config::default();
+        let entry_arena = DesktopEntryArena::from_vec(entries);
 
         // Measure plugin manager creation time
         let start = Instant::now();
-        let plugin_manager = PluginManager::new(entries.clone(), None, &config);
+        let plugin_manager = PluginManager::new(entry_arena, None, &config);
         let creation_time = start.elapsed();
 
         println!("Plugin manager creation: {:?}", creation_time);
@@ -526,7 +533,8 @@ fn test_e2e_advanced_calculator() {
         let scanner = DesktopScanner::new();
         let entries = scanner.scan().unwrap_or_default();
         let config = Config::default();
-        let plugin_manager = PluginManager::new(entries, None, &config);
+        let entry_arena = DesktopEntryArena::from_vec(entries);
+        let plugin_manager = PluginManager::new(entry_arena, None, &config);
 
         let test_cases = vec![
             ("2 + 2", "4"),
@@ -563,7 +571,8 @@ fn test_e2e_shell_commands() {
         let scanner = DesktopScanner::new();
         let entries = scanner.scan().unwrap_or_default();
         let config = Config::default();
-        let plugin_manager = PluginManager::new(entries, None, &config);
+        let entry_arena = DesktopEntryArena::from_vec(entries);
+        let plugin_manager = PluginManager::new(entry_arena, None, &config);
 
         // Test shell command detection
         let shell_queries = vec!["> ls -la", "> echo hello", "> pwd"];
@@ -592,7 +601,8 @@ fn test_e2e_error_handling() {
         let scanner = DesktopScanner::new();
         let entries = scanner.scan().unwrap_or_default();
         let config = Config::default();
-        let plugin_manager = PluginManager::new(entries, None, &config);
+        let entry_arena = DesktopEntryArena::from_vec(entries);
+        let plugin_manager = PluginManager::new(entry_arena, None, &config);
 
         // Test with very long query (shouldn't crash)
         let long_query = "a".repeat(10000);

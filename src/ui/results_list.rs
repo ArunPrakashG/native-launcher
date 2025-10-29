@@ -110,14 +110,27 @@ impl ResultsList {
             .map(|result| ListItem::PluginResult { result })
             .collect();
 
+        if new_items.is_empty() {
+            return;
+        }
+
         // Add to existing items - no need to clone, we can move
         let mut items = self.items.borrow_mut();
-        items.extend(new_items.iter().cloned()); // Clone only references, not the vec
+        let was_empty = items.is_empty();
+        items.extend(new_items.iter().cloned());
         drop(items);
 
         // Render only the new items to the UI
         for item in new_items {
             self.render_single_item(item);
+        }
+
+        if was_empty {
+            if let Some(first_row) = self.list.first_child() {
+                if let Some(row) = first_row.downcast_ref::<gtk4::ListBoxRow>() {
+                    self.list.select_row(Some(row));
+                }
+            }
         }
     }
 
@@ -223,6 +236,7 @@ impl ResultsList {
             .margin_start(24) // Indent actions
             .margin_end(0)
             .build();
+        row.add_css_class("inline-action-row");
 
         let content_box = GtkBox::builder()
             .orientation(Orientation::Vertical)
@@ -258,9 +272,14 @@ impl ResultsList {
             .spacing(12)
             .margin_top(0)
             .margin_bottom(0)
-            .margin_start(if is_linked_entry { 24 } else { 0 }) // Indent linked entries
+            .margin_start(if is_linked_entry { 8 } else { 0 }) // Subtle indent for linked entries
             .margin_end(0)
             .build();
+
+        if is_linked_entry {
+            row.add_css_class("inline-action-row");
+            row.add_css_class("inline-action-with-icon");
+        }
 
         // Add icon (with fallback to default icon)
         let icon_size = if is_linked_entry { 32 } else { 48 };

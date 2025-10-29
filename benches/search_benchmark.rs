@@ -1,5 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use native_launcher::desktop::{DesktopEntry, DesktopScanner};
+use native_launcher::desktop::{DesktopEntry, DesktopEntryArena, DesktopScanner};
 use native_launcher::search::SearchEngine;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -93,7 +93,8 @@ fn bench_search_engine_creation(c: &mut Criterion) {
 
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, _| {
             b.iter(|| {
-                let engine = SearchEngine::new(entries.clone());
+                let arena = DesktopEntryArena::from_vec(entries.clone());
+                let engine = SearchEngine::new(arena, false);
                 black_box(engine);
             });
         });
@@ -112,7 +113,8 @@ fn bench_fuzzy_search_performance(c: &mut Criterion) {
     // Test with different dataset sizes - focus on 500 apps (realistic)
     for size in [100, 500, 1000].iter() {
         let entries = create_test_entries(*size);
-        let engine = SearchEngine::new(entries);
+        let arena = DesktopEntryArena::from_vec(entries);
+        let engine = SearchEngine::new(arena, false);
 
         // Critical: Fuzzy search with common patterns
         group.bench_with_input(BenchmarkId::new("fuzzy_short_query", size), size, |b, _| {
@@ -167,7 +169,8 @@ fn bench_realistic_search_scenarios(c: &mut Criterion) {
         });
     }
 
-    let engine = SearchEngine::new(entries);
+    let arena = DesktopEntryArena::from_vec(entries);
+    let engine = SearchEngine::new(arena, false);
 
     // Real-world search patterns
     group.bench_function("search_firefox", |b| {
@@ -214,7 +217,8 @@ fn bench_search_performance(c: &mut Criterion) {
     // Test with different dataset sizes
     for size in [10, 50, 100, 500, 1000].iter() {
         let entries = create_test_entries(*size);
-        let engine = SearchEngine::new(entries);
+        let arena = DesktopEntryArena::from_vec(entries);
+        let engine = SearchEngine::new(arena, false);
 
         // Benchmark empty query (return all)
         group.bench_with_input(BenchmarkId::new("empty_query", size), size, |b, _| {

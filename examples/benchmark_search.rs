@@ -1,4 +1,4 @@
-use native_launcher::desktop::{DesktopEntry, DesktopScanner};
+use native_launcher::desktop::{DesktopEntry, DesktopEntryArena, DesktopScanner};
 use native_launcher::search::SearchEngine;
 use std::path::PathBuf;
 use std::time::Instant;
@@ -32,7 +32,8 @@ fn main() {
 
         // Measure SearchEngine creation
         let start = Instant::now();
-        let engine = SearchEngine::new(entries.clone());
+        let arena = DesktopEntryArena::from_vec(entries.clone());
+        let engine = SearchEngine::new(arena, false);
         let creation_time = start.elapsed();
         println!("  SearchEngine creation: {:?}", creation_time);
 
@@ -87,7 +88,8 @@ fn main() {
             );
 
             let start = Instant::now();
-            let engine = SearchEngine::new(real_entries.clone());
+            let arena = DesktopEntryArena::from_vec(real_entries.clone());
+            let engine = SearchEngine::new(arena, false);
             let creation_time = start.elapsed();
             println!("  SearchEngine creation: {:?}", creation_time);
 
