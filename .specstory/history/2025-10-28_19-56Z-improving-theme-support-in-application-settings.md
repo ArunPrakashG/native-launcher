@@ -3165,9 +3165,46 @@ You may want to launch the screenshot flow once (`@ss`) to confirm clipboard int
 
 ---
 
-_**User (2025-10-29 15:26Z)**_
+_**User (2025-10-29 15:30Z)**_
 
 download clicking an item does not seem to open it. this action is same as pressing enter
+
+---
+
+_**Assistant (copilot/gpt-5-codex)**_
+
+**Checking row activation handler****Adding click handling for search results****Searching for .connect_row usage****Analyzing ListBox row activation handling****Inspecting ResultsList structure****Checking main UI directory****Designing unified selection handler****Planning selection handler function**
+
+I’m outlining a helper function to unify logic for row activation and Enter key handling, including theme application and usage tracking, while considering necessary imports and where to place this function in the file.**Checking `build_ui` function usage****Refactoring UI interaction handlers**
+
+I'm preparing to add a helper function to centralize command execution and theme switching logic, which will be called both from keyboard handling and row activation in the GTK UI. This helper will manage window closing carefully—avoiding it when switching themes—and log actions, while replacing inline code inside `build_ui`. I'm also planning to hook the row-activated signal to use this helper, ensuring consistent behavior between keyboard and mouse actions without duplicating logic.**Implementing result handling helper and row activation**
+
+I'm integrating a helper function to unify how selected results are processed, including theme changes and launching commands, then modifying `connect_activate` to use it. I'll also add row activation handling to trigger the same helper on double-click or Enter press, making sure closure captures all needed variables properly.
+```
+
+```
+**Adding row activation block**
+```
+
+```
+**Inserting helper function**
+```
+
+```
+**Checking imports and formatting****Running tests to ensure correctness****Summarizing final response details**
+
+I'm preparing a clear explanation of the main change—linking ListBox row activation with selection handling to enable double-click support alongside Enter key, and extracting selection logic for reuse. I'll highlight affected files and functions like `src/main.rs` and `handle_selected_result`, summarize tests that ran, and suggest manual testing for the new double-click functionality. This keeps the final message focused, informative, and aligned with the user’s earlier concerns.Hooked the results list’s `row-activated` signal to the same launch routine used for Enter presses, so double-click now opens the selected item just like the keyboard path. Centralized that launch logic in `handle_selected_result` (`main.rs`) to keep theme switching, usage tracking, and command execution consistent across activation modes, and reused it in the Enter handler.
+
+Tests: `cargo fmt`, `cargo test --lib`.
+
+You may want to manually double-click a few items (including theme entries and regular apps) to confirm the behavior feels right.
+
+---
+
+_**User (2025-10-29 16:16Z)**_
+
+the updater is not working as expected, the install.sh has an updater as well, not working as expected.
+could it be, since we are running the app as daemon, it is always active so we cant modify the binary file?
 
 ---
 
