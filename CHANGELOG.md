@@ -22,6 +22,8 @@
 - All compilation warnings resolved
 - Type mismatches in daemon mode
 
+## [0.1.2] - 2025-10-29
+
 ## [0.1.1] - 2025-10-28
 
 ## [0.1.0] - 2025-10-28
