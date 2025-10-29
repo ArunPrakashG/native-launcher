@@ -9,5 +9,5 @@ pub use keyboard_hints::KeyboardHints;
 pub use results_list::ResultsList;
 pub use search_entry::SearchWidget;
 pub use search_footer::SearchFooter;
-pub use theme::load_theme;
+pub use theme::load_theme_with_name;
 pub use window::LauncherWindow;

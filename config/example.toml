@@ -1,0 +1,101 @@
+# Native Launcher Configuration Example
+# Copy this file to ~/.config/native-launcher/config.toml and customize
+# All settings are optional - defaults will be used if not specified
+
+# === Window Configuration ===
+[window]
+# Window dimensions in pixels
+width = 700
+height = 550
+
+# Window position: "top", "center", or "bottom" (currently center only)
+position = "top"
+
+# Enable semi-transparent background (requires compositor support)
+transparency = true
+
+# === Search Configuration ===
+[search]
+# Maximum number of results to display
+max_results = 10
+
+# Enable fuzzy matching (vs exact substring match)
+fuzzy_matching = true
+
+# Enable usage-based ranking (frequently used apps appear higher)
+usage_ranking = true
+
+# Minimum score threshold for results (0-100)
+# Lower values show more results, higher values only show close matches
+min_score_threshold = 0
+
+# === UI Configuration ===
+[ui]
+# Icon size in pixels
+icon_size = 48
+
+# Show keyboard hints at the bottom
+show_keyboard_hints = true
+
+# Animation duration in milliseconds (PERFORMANCE: Keep low for speed)
+animation_duration = 80
+
+# Theme selection
+# Built-in themes: "dark", "light", "dracula", "nord", "high-contrast"
+# Or specify path to custom CSS file: "/path/to/custom.css"
+theme = "dark"
+
+# Available built-in themes:
+# - "dark"          - Default coral/red accent on dark charcoal (Native Launcher design)
+# - "dracula"       - Popular Dracula color scheme (purple accent)
+# - "nord"          - Nord color palette (blue/teal accent)
+# - "light"         - Light theme variant
+# - "high-contrast" - High contrast for accessibility
+#
+# Custom themes:
+# - Absolute path: theme = "/home/user/.config/native-launcher/mytheme.css"
+# - Relative to config: Copy to ~/.config/native-launcher/theme.css
+#
+# Theme priority:
+# 1. Absolute path if specified
+# 2. Built-in theme by name
+# 3. ~/.config/native-launcher/theme.css (if exists)
+# 4. Default (dark theme)
+
+# Show empty state on launch (Spotlight-style)
+# When true, results are hidden until user types
+# When false, shows all apps on launch
+empty_state_on_launch = true
+
+# === Plugin Configuration ===
+[plugins]
+# Enable/disable individual plugins
+
+# Calculator plugin (evaluate math expressions)
+calculator = true
+
+# Shell command plugin (prefix: ">")
+shell = true
+
+# Web search plugin (search engines)
+web_search = true
+
+# SSH connection plugin
+ssh = true
+
+# Editor workspaces plugin (VS Code, etc.)
+editors = true
+
+# File browser plugin
+files = true
+
+# Shell command prefix (what you type to execute shell commands)
+shell_prefix = ">"
+
+# === Updater Configuration ===
+[updater]
+# Check for updates on startup
+check_on_startup = true
+
+# Automatically download updates (not yet implemented)
+auto_download = false

@@ -21,6 +21,11 @@ icon_size = 48
 # Theme: "dark", "light", or path to custom CSS file
 theme = "dark"
 
+[environment]
+# Merge login-shell environment variables into spawned applications.
+# Disabled by default to avoid extra shell startup cost.
+merge_login_env = false
+
 [behavior]
 # Global keyboard shortcut (configured in compositor)
 # This is just documentation - actual binding happens in compositor config

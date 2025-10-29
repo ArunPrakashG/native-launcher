@@ -114,10 +114,7 @@ impl UsageTracker {
 
     /// Record a launch for an application
     pub fn record_launch(&mut self, desktop_path: &str) {
-        let entry = self
-            .usage_data
-            .entry(desktop_path.to_string())
-            .or_default();
+        let entry = self.usage_data.entry(desktop_path.to_string()).or_default();
 
         entry.record_launch();
 

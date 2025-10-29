@@ -10,6 +10,7 @@ pub struct Config {
     pub ui: UIConfig,
     pub plugins: PluginsConfig,
     pub updater: UpdaterConfig,
+    pub environment: EnvironmentConfig,
 }
 
 /// Window configuration
@@ -106,6 +107,8 @@ pub struct PluginsConfig {
     pub editors: bool,
     /// Enable file browser plugin
     pub files: bool,
+    /// Enable launcher (self-update) plugin
+    pub launcher: bool,
     /// Shell command prefix (default: ">")
     pub shell_prefix: String,
 }
@@ -119,6 +122,7 @@ impl Default for PluginsConfig {
             ssh: true,
             editors: true,
             files: true,
+            launcher: true,
             shell_prefix: ">".to_string(),
         }
     }
@@ -143,6 +147,22 @@ impl Default for UpdaterConfig {
     }
 }
 
+/// Environment configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct EnvironmentConfig {
+    /// Merge login-shell environment variables into spawned processes
+    pub merge_login_env: bool,
+}
+
+impl Default for EnvironmentConfig {
+    fn default() -> Self {
+        Self {
+            merge_login_env: false,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -153,6 +173,7 @@ mod tests {
         assert_eq!(config.window.width, 700);
         assert_eq!(config.search.max_results, 10);
         assert_eq!(config.ui.icon_size, 48);
+        assert!(!config.environment.merge_login_env);
     }
 
     #[test]

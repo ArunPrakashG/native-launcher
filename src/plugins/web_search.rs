@@ -111,8 +111,18 @@ impl Plugin for WebSearchPlugin {
     }
 
     fn should_handle(&self, query: &str) -> bool {
-        // Handle explicit web search queries or offer fallback for any query
-        self.enabled && !query.is_empty() && query.len() >= 2
+        if !self.enabled || query.is_empty() || query.len() < 2 {
+            return false;
+        }
+
+        // Don't handle if query starts with @ (unless it's @web)
+        // This prevents web search from showing during other plugin commands
+        if query.starts_with('@') {
+            return query.starts_with("@web");
+        }
+
+        // Handle all other queries as potential web searches
+        true
     }
 
     fn search(&self, query: &str, _context: &PluginContext) -> Result<Vec<PluginResult>> {
@@ -203,6 +213,30 @@ mod tests {
     }
 
     #[test]
+    fn test_should_handle() {
+        let web = WebSearchPlugin::new();
+
+        // Should handle regular queries
+        assert!(web.should_handle("firefox"));
+        assert!(web.should_handle("google rust"));
+        assert!(web.should_handle("search term"));
+
+        // Should handle @web prefix
+        assert!(web.should_handle("@web rust"));
+        assert!(web.should_handle("@web"));
+
+        // Should NOT handle other @ commands
+        assert!(!web.should_handle("@theme"));
+        assert!(!web.should_handle("@workspace"));
+        assert!(!web.should_handle("@code"));
+        assert!(!web.should_handle("@calc"));
+
+        // Should not handle empty or too short
+        assert!(!web.should_handle(""));
+        assert!(!web.should_handle("a"));
+    }
+
+    #[test]
     fn test_build_url() {
         let web = WebSearchPlugin::new();
 
@@ -213,8 +247,11 @@ mod tests {
 
     #[test]
     fn test_search() {
+        use crate::config::Config;
+
         let web = WebSearchPlugin::new();
-        let ctx = PluginContext::new(10);
+        let config = Config::default();
+        let ctx = PluginContext::new(10, &config);
 
         let results = web.search("google rust", &ctx).unwrap();
         assert_eq!(results.len(), 1);

@@ -233,9 +233,13 @@ impl Plugin for SshPlugin {
             return false;
         }
 
-        // Trigger on "@ssh" prefix or "ssh" prefix or if query matches host name
-        query.starts_with("@ssh")
-            || query.starts_with("ssh")
+        // Don't interfere with other @ commands (unless it's @ssh)
+        if query.starts_with('@') {
+            return query.starts_with("@ssh");
+        }
+
+        // Trigger on "ssh" prefix or if query matches host name
+        query.starts_with("ssh")
             || self.hosts.iter().any(|h| {
                 h.name.to_lowercase().contains(&query.to_lowercase())
                     || h.hostname.to_lowercase().contains(&query.to_lowercase())

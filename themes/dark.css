@@ -25,6 +25,13 @@
   /* Shadow Colors */
   --nl-shadow: rgba(0, 0, 0, 0.3);
   --nl-shadow-strong: rgba(0, 0, 0, 0.5);
+
+  /* Border Radius - Customize for different roundness levels */
+  --nl-radius-window: 20px;
+  --nl-radius-large: 16px;
+  --nl-radius-medium: 14px;
+  --nl-radius-small: 10px;
+  --nl-radius-tiny: 8px;
 }
 
 /* === Main Window - Native Launcher Container === */
@@ -243,11 +250,7 @@ listbox row:hover box[margin-start="24"] {
 
 /* Subtle background gradient for window */
 window {
-  background: linear-gradient(
-    180deg,
-    var(--nl-bg-primary) 0%,
-    #18181a 100%
-  );
+  background: linear-gradient(180deg, var(--nl-bg-primary) 0%, #18181a 100%);
 }
 
 /* === Keyboard Hints === */

@@ -24,8 +24,7 @@ impl SearchWidget {
 
         let entry = Entry::builder()
             .placeholder_text("Search applications...")
-            .hexpand(true)
-            .build();
+            .build(); // Removed hexpand - window is fixed size
 
         container.append(&entry);
 

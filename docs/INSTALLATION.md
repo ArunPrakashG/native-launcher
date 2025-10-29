@@ -1,222 +1,428 @@
-# Installation Scripts
+# Installation Guide
 
-This directory contains automated installation and uninstallation scripts for Native Launcher.
+This guide covers all installation methods for Native Launcher.
 
-## Install Script (`install.sh`)
+## Table of Contents
 
-### Features
+- [Quick Install](#quick-install)
+- [Backup & Restore](#backup--restore)
+- [Manual Installation](#manual-installation)
+- [Building from Source](#building-from-source)
+- [Compositor Configuration](#compositor-configuration)
+- [Theme Selection](#theme-selection)
+- [Troubleshooting](#troubleshooting)
 
-- **Automatic System Detection**: Detects Linux distribution and Wayland compositor
-- **Dependency Management**: Installs GTK4 and gtk4-layer-shell automatically
-- **Latest Release**: Downloads and installs the latest GitHub release
-- **Configuration Setup**: Creates default configuration file
-- **Keybind Setup**: Automatically configures compositor keybinds (Hyprland, Sway)
+---
 
-### Supported Systems
+## Quick Install
 
-**Linux Distributions:**
-
-- Arch Linux / Manjaro / EndeavourOS ⭐ (primary support)
-- Ubuntu / Debian / Pop!\_OS
-- Fedora
-- openSUSE
-
-**Wayland Compositors:**
-
-- Hyprland ⭐ (automatic keybind setup)
-- Sway (automatic keybind setup)
-- KDE Plasma Wayland (manual setup instructions)
-- GNOME Wayland (automatic via gsettings)
-- River, Wayfire, etc. (manual setup instructions)
-
-### Usage
-
-**One-line install:**
+The easiest way to install Native Launcher is using the automated installer:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ArunPrakashG/native-launcher/main/install.sh | bash
 ```
 
-**Download and inspect first:**
+### What the Installer Does
+
+The installation process follows these steps:
+
+1. **Backup** - Automatically backs up existing installation (if found)
+2. **System Detection** - Detects your Linux distribution and Wayland compositor
+3. **Dependency Installation** - Installs required packages (GTK4, gtk4-layer-shell, wl-clipboard)
+4. **Download Binary** - Fetches the latest release from GitHub
+5. **Theme Selection** - Interactive theme chooser (6 themes available)
+6. **Configuration** - Generates config files with your chosen theme
+7. **Compositor Setup** - Automatically configures keybinds (Hyprland/Sway)
+
+### Interactive vs Non-Interactive Mode
 
 ```bash
-wget https://raw.githubusercontent.com/ArunPrakashG/native-launcher/main/install.sh
-chmod +x install.sh
-./install.sh
+# Interactive (default) - asks for confirmation and theme choice
+curl -fsSL https://raw.githubusercontent.com/ArunPrakashG/native-launcher/main/install.sh | bash
+
+# Non-interactive - uses defaults, no prompts
+curl -fsSL https://raw.githubusercontent.com/ArunPrakashG/native-launcher/main/install.sh | bash -s -- --non-interactive
 ```
 
-**Show help:**
+---
+
+## Backup & Restore
+
+### Automatic Backups
+
+The installer **automatically backs up** your existing installation before making changes. This includes:
+
+- ✅ Binary (`~/.local/bin/native-launcher`)
+- ✅ Configuration (`~/.config/native-launcher/config.toml`)
+- ✅ Plugins (`~/.config/native-launcher/plugins/`)
+- ✅ Cache (`~/.cache/native-launcher/*`)
+- ✅ Usage data (`~/.local/share/native-launcher/*`)
+
+Backups are stored in:
+
+```
+~/.local/share/native-launcher/backups/YYYYMMDD_HHMMSS/
+```
+
+Example:
+
+```
+~/.local/share/native-launcher/backups/20240315_143022/
+├── native-launcher        (binary)
+├── config/
+│   ├── config.toml
+│   └── plugins/
+├── cache/
+└── data/
+```
+
+### Restoring from Backup
+
+If you need to restore a previous version:
 
 ```bash
-./install.sh --help
+# Download and run restore script
+curl -fsSL https://raw.githubusercontent.com/ArunPrakashG/native-launcher/main/restore.sh | bash
+
+# Or if you cloned the repo
+./restore.sh
 ```
 
-### What Gets Installed
+The restore script will:
 
-- **Binary**: `~/.local/bin/native-launcher`
-- **Config**: `~/.config/native-launcher/config.toml`
-- **Compositor keybind**: Auto-configured for supported compositors
+1. List all available backups with timestamps
+2. Show what's included in each backup
+3. Let you select which backup to restore
+4. Restore all components (binary, config, plugins, cache, data)
 
-### Requirements
+### Manual Restore
 
-The script will automatically install:
-
-- `curl` (for downloading)
-- `tar` (for extracting)
-- `jq` (for JSON parsing)
-- `gtk4` (GTK4 libraries)
-- `gtk4-layer-shell` (Layer shell support)
-
-## Uninstall Script (`uninstall.sh`)
-
-### Features
-
-- **Clean Removal**: Removes binary and optionally config/cache/data
-- **Keybind Cleanup**: Removes compositor keybinds (with backup)
-- **Interactive**: Prompts before removing user data
-
-### Usage
-
-**One-line uninstall:**
+You can also manually restore from a backup:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ArunPrakashG/native-launcher/main/uninstall.sh | bash
+# Find your backup
+ls ~/.local/share/native-launcher/backups/
+
+# Restore binary
+cp ~/.local/share/native-launcher/backups/20240315_143022/native-launcher ~/.local/bin/
+
+# Restore config
+cp ~/.local/share/native-launcher/backups/20240315_143022/config/config.toml ~/.config/native-launcher/
+
+# Restore plugins
+cp -r ~/.local/share/native-launcher/backups/20240315_143022/config/plugins/* ~/.config/native-launcher/plugins/
 ```
 
-**Download and run:**
-
-```bash
-wget https://raw.githubusercontent.com/ArunPrakashG/native-launcher/main/uninstall.sh
-chmod +x uninstall.sh
-./uninstall.sh
-```
-
-### What Gets Removed
-
-The script prompts before removing:
-
-- Binary: `~/.local/bin/native-launcher`
-- Config: `~/.config/native-launcher/` (optional)
-- Cache: `~/.cache/native-launcher/` (optional)
-- Data: `~/.local/share/native-launcher/` (optional, includes usage stats)
-- Compositor keybinds (optional, with backup)
+---
 
 ## Manual Installation
 
-If you prefer manual installation or the scripts don't work for your system:
+If you prefer to install manually:
 
 ### 1. Install Dependencies
 
-**Arch Linux:**
+**Arch Linux / Manjaro:**
 
 ```bash
 sudo pacman -S gtk4 gtk4-layer-shell wl-clipboard
 ```
 
-**Ubuntu/Debian:**
+**Ubuntu / Debian:**
 
 ```bash
-sudo apt install libgtk-4-1 libgtk-4-dev gtk4-layer-shell wl-clipboard
+sudo apt update
+sudo apt install libgtk-4-dev gtk4-layer-shell wl-clipboard
 ```
 
 **Fedora:**
 
 ```bash
-sudo dnf install gtk4 gtk4-devel gtk4-layer-shell wl-clipboard
+sudo dnf install gtk4-devel gtk4-layer-shell wl-clipboard
 ```
 
 ### 2. Download Binary
 
-Download the latest release from [GitHub Releases](https://github.com/ArunPrakashG/native-launcher/releases):
-
 ```bash
-# Get latest release URL (requires jq)
-DOWNLOAD_URL=$(curl -s https://api.github.com/repos/ArunPrakashG/native-launcher/releases/latest | jq -r '.assets[] | select(.name | test("native-launcher.*linux.*tar.gz")) | .browser_download_url')
-
-# Download and extract
-curl -L -o native-launcher.tar.gz "$DOWNLOAD_URL"
-tar -xzf native-launcher.tar.gz
-```
-
-### 3. Install Binary
-
-```bash
+# Create installation directory
 mkdir -p ~/.local/bin
-cp native-launcher ~/.local/bin/
+
+# Download latest release
+curl -L -o ~/.local/bin/native-launcher \
+  https://github.com/ArunPrakashG/native-launcher/releases/latest/download/native-launcher
+
+# Make executable
 chmod +x ~/.local/bin/native-launcher
 ```
 
-### 4. Add to PATH
-
-Add to `~/.bashrc` or `~/.zshrc`:
+### 3. Create Configuration
 
 ```bash
-export PATH="$HOME/.local/bin:$PATH"
+# Create config directory
+mkdir -p ~/.config/native-launcher
+
+# Download default config
+curl -L -o ~/.config/native-launcher/config.toml \
+  https://raw.githubusercontent.com/ArunPrakashG/native-launcher/main/config/default.toml
 ```
 
-### 5. Configure Compositor
+### 4. Configure Compositor
 
-See the README for compositor-specific keybind configuration.
+See [Compositor Configuration](#compositor-configuration) below.
 
-## Build from Source
+---
 
-If you want to build from source instead:
+## Building from Source
+
+### Prerequisites
+
+- Rust 1.75 or later
+- GTK4 development libraries
+- gtk4-layer-shell development libraries
+
+### Install Rust
 
 ```bash
-# Install Rust
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source ~/.cargo/env
+```
 
+### Clone and Build
+
+```bash
 # Clone repository
 git clone https://github.com/ArunPrakashG/native-launcher.git
 cd native-launcher
 
-# Build release
+# Build release binary
 cargo build --release
 
-# Install
+# Install binary
 cp target/release/native-launcher ~/.local/bin/
+
+# Generate default config
+mkdir -p ~/.config/native-launcher
+cp config/default.toml ~/.config/native-launcher/config.toml
 ```
+
+### Development Build
+
+```bash
+# Build and run in debug mode
+RUST_LOG=debug cargo run
+
+# Run tests
+cargo test
+
+# Run benchmarks
+cargo bench
+```
+
+---
+
+## Compositor Configuration
+
+### Hyprland
+
+Add to `~/.config/hypr/hyprland.conf`:
+
+```bash
+bind = SUPER, SPACE, exec, ~/.local/bin/native-launcher
+```
+
+Reload config:
+
+```bash
+hyprctl reload
+```
+
+### Sway
+
+Add to `~/.config/sway/config`:
+
+```bash
+bindsym Mod4+Space exec ~/.local/bin/native-launcher
+```
+
+Reload config:
+
+```bash
+swaymsg reload
+```
+
+### River
+
+Add to `~/.config/river/init`:
+
+```bash
+riverctl map normal Super Space spawn ~/.local/bin/native-launcher
+```
+
+### KDE Plasma (Wayland)
+
+1. Open System Settings → Shortcuts → Custom Shortcuts
+2. Edit → New → Global Shortcut → Command/URL
+3. Trigger: **Meta+Space**
+4. Command: `~/.local/bin/native-launcher`
+
+### GNOME (Wayland)
+
+Install and use a keybind extension:
+
+```bash
+# Using gsettings
+gsettings set org.gnome.settings-daemon.plugins.media-keys custom-keybindings \
+  "['/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/']"
+
+gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/ \
+  name 'Native Launcher'
+
+gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/ \
+  command '~/.local/bin/native-launcher'
+
+gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/ \
+  binding '<Super>space'
+```
+
+---
+
+## Theme Selection
+
+Native Launcher includes 6 beautiful themes:
+
+### Available Themes
+
+| #   | Theme           | Accent             | Background         |
+| --- | --------------- | ------------------ | ------------------ |
+| 1   | **Default**     | Coral `#FF6363`    | Charcoal `#1C1C1E` |
+| 2   | **Nord**        | Frost `#88C0D0`    | Polar `#2E3440`    |
+| 3   | **Dracula**     | Purple `#BD93F9`   | Dark `#282A36`     |
+| 4   | **Catppuccin**  | Lavender `#B4BEFE` | Mocha `#1E1E2E`    |
+| 5   | **Gruvbox**     | Orange `#FE8019`   | Dark `#282828`     |
+| 6   | **Tokyo Night** | Blue `#7AA2F7`     | Night `#1A1B26`    |
+
+### Changing Themes
+
+#### During Installation
+
+The installer will ask you to choose a theme interactively.
+
+#### After Installation
+
+Edit `~/.config/native-launcher/config.toml`:
+
+```toml
+[ui]
+theme = "Nord"  # Change to: Default, Nord, Dracula, Catppuccin, Gruvbox, or TokyoNight
+```
+
+Then restart Native Launcher.
+
+#### Reinstall with Theme
+
+```bash
+# Reinstall and choose a different theme
+curl -fsSL https://raw.githubusercontent.com/ArunPrakashG/native-launcher/main/install.sh | bash
+```
+
+Your previous installation will be backed up automatically.
+
+---
 
 ## Troubleshooting
 
-### Script fails to download release
+### Binary not found
 
-- Check your internet connection
-- Verify GitHub API access: `curl -s https://api.github.com/repos/ArunPrakashG/native-launcher/releases/latest`
-- Try manual installation instead
+Ensure `~/.local/bin` is in your `$PATH`:
 
-### Missing dependencies
-
-The script should install dependencies automatically. If it fails:
-
-- Check the error message
-- Install dependencies manually for your distribution
-- Report the issue on GitHub
+```bash
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc  # or ~/.zshrc
+source ~/.bashrc
+```
 
 ### Keybind not working
 
-- Verify the binary is in PATH: `which native-launcher`
-- Check compositor config file for the keybind
-- Reload compositor configuration
-- Try running manually: `~/.local/bin/native-launcher`
+1. Check compositor configuration
+2. Reload compositor config
+3. Test binary manually: `~/.local/bin/native-launcher`
+4. Check for conflicts with existing keybinds
 
-### Permission denied
+### Window not appearing
 
-- Ensure script is executable: `chmod +x install.sh`
-- Check file permissions in `~/.local/bin`
-- Verify you have write access to `~/.local/bin` and `~/.config`
+1. Verify GTK4 and gtk4-layer-shell are installed
+2. Check you're running Wayland (not X11):
 
-## Contributing
+```bash
+echo $XDG_SESSION_TYPE  # Should output: wayland
+```
 
-Found a bug or want to add support for another distribution/compositor?
+3. Check logs:
 
-1. Fork the repository
-2. Make your changes to `install.sh` or `uninstall.sh`
-3. Test on your system
-4. Submit a pull request
+```bash
+RUST_LOG=debug ~/.local/bin/native-launcher
+```
 
-Please test thoroughly on your target system before submitting!
+### Missing dependencies
 
-## License
+Run the installer again to install dependencies:
 
-These scripts are part of Native Launcher and licensed under the MIT License.
+```bash
+curl -fsSL https://raw.githubusercontent.com/ArunPrakashG/native-launcher/main/install.sh | bash
+```
+
+### Config file errors
+
+Reset to default config:
+
+```bash
+curl -L -o ~/.config/native-launcher/config.toml \
+  https://raw.githubusercontent.com/ArunPrakashG/native-launcher/main/config/default.toml
+```
+
+### Updates not detected
+
+The updater checks for new versions every 24 hours. To force a check:
+
+1. Delete update cache: `rm ~/.cache/native-launcher/update_check.json`
+2. Restart Native Launcher
+
+Or manually check: [Releases Page](https://github.com/ArunPrakashG/native-launcher/releases)
+
+### Restore from backup not working
+
+If the restore script fails:
+
+1. Check backup directory: `ls ~/.local/share/native-launcher/backups/`
+2. Manually restore (see [Manual Restore](#manual-restore))
+3. Report issue with error details
+
+---
+
+## Uninstallation
+
+To completely remove Native Launcher:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ArunPrakashG/native-launcher/main/uninstall.sh | bash
+```
+
+This will remove:
+
+- Binary: `~/.local/bin/native-launcher`
+- Config: `~/.config/native-launcher/`
+- Cache: `~/.cache/native-launcher/`
+- Data: `~/.local/share/native-launcher/`
+
+**Note:** Backups are kept by default. Delete manually if needed:
+
+```bash
+rm -rf ~/.local/share/native-launcher/backups/
+```
+
+---
+
+## Support
+
+- 📖 [Wiki](https://github.com/ArunPrakashG/native-launcher/wiki)
+- 🐛 [Report Bug](https://github.com/ArunPrakashG/native-launcher/issues)
+- 💡 [Request Feature](https://github.com/ArunPrakashG/native-launcher/issues)
+- 💬 [Discussions](https://github.com/ArunPrakashG/native-launcher/discussions)

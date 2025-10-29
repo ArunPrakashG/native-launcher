@@ -26,22 +26,29 @@
   --nl-shadow: rgba(0, 0, 0, 0.3);
   --nl-shadow-strong: rgba(0, 0, 0, 0.5);
 
-  /* Animation Timings */
-  --nl-animation-fast: 0.15s;
-  --nl-animation-normal: 0.25s;
-  --nl-animation-slow: 0.35s;
+  /* Border Radius - Customizable Design Language */
+  --nl-radius-window: 20px;
+  --nl-radius-large: 16px;
+  --nl-radius-medium: 14px;
+  --nl-radius-small: 10px;
+  --nl-radius-tiny: 8px;
+
+  /* Animation Timings - PERFORMANCE FIRST: Keep all animations snappy */
+  --nl-animation-fast: 0.08s;
+  --nl-animation-normal: 0.12s;
+  --nl-animation-slow: 0.15s;
   --nl-easing: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* === Main Window === */
 window {
   background: linear-gradient(180deg, var(--nl-bg-primary) 0%, #18181a 100%);
-  border-radius: 20px;
+  border-radius: var(--nl-radius-window);
   border: 1px solid var(--nl-border);
   box-shadow: 0 20px 80px var(--nl-shadow-strong),
     0 0 0 0.5px rgba(255, 255, 255, 0.05) inset;
   padding: 0;
-  animation: windowAppear var(--nl-animation-slow) var(--nl-easing);
+  /* PERFORMANCE: No window animation - instant display for speed */
 }
 
 /* === Search Entry === */
@@ -49,8 +56,8 @@ entry {
   font-size: 20px;
   font-weight: 400;
   padding: 16px 24px;
-  margin: 16px;
-  border-radius: 16px;
+  margin: 16px 16px 8px 16px; /* Consistent 16px horizontal margins */
+  border-radius: var(--nl-radius-large);
   background-color: var(--nl-bg-secondary);
   color: var(--nl-text-primary);
   border: 1px solid transparent;
@@ -66,77 +73,52 @@ entry:focus {
   transform: scale(1.01);
 }
 
-entry::placeholder {
-  color: var(--nl-text-quaternary);
-  font-weight: 400;
-}
-
 entry::selection {
   background-color: var(--nl-primary);
   color: var(--nl-text-primary);
 }
 
 /* === Scrolled Window - Clean Container === */
+/* PERFORMANCE: Always expanded viewport - no shrink/expand animation */
 scrolledwindow {
   border: none;
   background-color: transparent;
-  margin: 0 8px 8px 8px;
-  border-radius: 16px;
+  margin: 0 16px 16px 16px; /* Consistent 16px margins to match search entry */
+  border-radius: var(--nl-radius-large);
+  min-height: 400px; /* Keep viewport expanded even when empty */
+  max-height: 400px; /* Prevent expansion beyond this - FIXED SIZE */
+  /* Add subtle background and padding for visual consistency */
+  background-color: var(--nl-bg-secondary);
+  padding: 8px; /* Consistent 8px padding all around */
+}
+
+/* Make scrolled window's internal viewport have rounded corners */
+scrolledwindow > viewport {
+  border-radius: var(--nl-radius-large);
+  background-color: transparent;
 }
 
 /* === List Box - Results Container === */
 listbox {
   background-color: transparent;
-  padding: 0;
-  border-top: 1px solid var(--nl-border);
-  border-radius: 16px;
+  padding: 4px 0; /* Minimal vertical padding, horizontal padding from scrolledwindow */
+  border-radius: var(--nl-radius-large);
+  /* Remove border-top as we now have the scrolled window background */
 }
 
-/* === List Rows - Result Items with Animations === */
+/* === List Rows - Result Items === */
+/* PERFORMANCE: No stagger animation - instant display */
 listbox row {
-  padding: 14px 20px;
-  margin: 3px 12px;
-  border-radius: 14px;
+  padding: 14px 16px; /* Match search entry horizontal padding (16px) */
+  margin: 3px 8px; /* Consistent margin within container */
+  border-radius: var(--nl-radius-medium);
   background: transparent;
-  transition: all var(--nl-animation-fast) var(--nl-easing),
-    opacity var(--nl-animation-normal) var(--nl-easing),
-    transform var(--nl-animation-normal) var(--nl-easing);
+  transition: background-color var(--nl-animation-fast) var(--nl-easing),
+    transform var(--nl-animation-fast) var(--nl-easing),
+    box-shadow var(--nl-animation-fast) var(--nl-easing);
   border: none;
-  opacity: 0;
-  transform: translateX(-10px) scale(0.98);
-  animation: rowSlideIn var(--nl-animation-normal) var(--nl-easing) forwards;
-}
-
-/* Stagger animation for multiple rows */
-listbox row:nth-child(1) {
-  animation-delay: 0.02s;
-}
-listbox row:nth-child(2) {
-  animation-delay: 0.04s;
-}
-listbox row:nth-child(3) {
-  animation-delay: 0.06s;
-}
-listbox row:nth-child(4) {
-  animation-delay: 0.08s;
-}
-listbox row:nth-child(5) {
-  animation-delay: 0.1s;
-}
-listbox row:nth-child(6) {
-  animation-delay: 0.12s;
-}
-listbox row:nth-child(7) {
-  animation-delay: 0.14s;
-}
-listbox row:nth-child(8) {
-  animation-delay: 0.16s;
-}
-listbox row:nth-child(9) {
-  animation-delay: 0.18s;
-}
-listbox row:nth-child(10) {
-  animation-delay: 0.2s;
+  opacity: 1;
+  /* No initial transform - instant display */
 }
 
 listbox row:hover {
@@ -160,10 +142,8 @@ listbox row:selected:hover {
 
 /* === Application Icons === */
 .app-icon {
-  min-width: 48px;
-  min-height: 48px;
-  margin-right: 6px;
-  border-radius: 12px;
+  margin: 0;
+  border-radius: var(--nl-radius-small);
   transition: transform var(--nl-animation-fast) var(--nl-easing);
 }
 
@@ -176,6 +156,7 @@ listbox row:selected .app-icon {
 .workspace-icon {
   opacity: 0.6;
   filter: grayscale(0.3);
+  margin: 0;
   transition: opacity var(--nl-animation-fast) ease,
     filter var(--nl-animation-fast) ease,
     transform var(--nl-animation-fast) var(--nl-easing);
@@ -230,7 +211,7 @@ scrollbar {
 
 scrollbar slider {
   background: var(--nl-text-quaternary);
-  border-radius: 12px;
+  border-radius: var(--nl-radius-small);
   min-width: 6px;
   min-height: 40px;
   margin: 4px;
@@ -240,7 +221,7 @@ scrollbar slider {
 scrollbar slider:hover {
   background: var(--nl-text-tertiary);
   min-width: 10px;
-  border-radius: 12px;
+  border-radius: var(--nl-radius-small);
 }
 
 scrollbar slider:active {
@@ -250,13 +231,12 @@ scrollbar slider:active {
 /* === Box Container - Smooth Layout === */
 box {
   transition: all var(--nl-animation-fast) var(--nl-easing);
-  border-radius: 12px;
+  border-radius: var(--nl-radius-small);
 }
 
 /* === Better text rendering === */
 label,
 entry {
-  -gtk-font-smoothing: antialiased;
   font-feature-settings: "liga" 1, "kern" 1;
 }
 
@@ -271,23 +251,28 @@ scrolledwindow {
 }
 
 /* === Entry text === */
-entry text {
+entry > text {
   color: var(--nl-text-primary);
+}
+
+entry > text > placeholder {
+  color: var(--nl-text-quaternary);
+  font-weight: 400;
 }
 
 /* === Additional Polish === */
 listbox row {
-  margin: 2px 8px;
+  margin: 3px 8px; /* Already set above - consistent spacing */
 }
 
 /* First item styling */
 listbox row:first-child {
-  margin-top: 12px;
+  margin-top: 8px; /* Consistent with scrolledwindow padding */
 }
 
 /* Last item styling */
 listbox row:last-child {
-  margin-bottom: 12px;
+  margin-bottom: 8px; /* Consistent with scrolledwindow padding */
 }
 
 /* === Desktop Actions Support - Inline Display === */
@@ -313,7 +298,7 @@ listbox row:hover .action-name {
 listbox row box[margin-start="24"] {
   padding-left: 12px;
   border-left: 3px solid var(--nl-text-quaternary);
-  border-radius: 0 8px 8px 0;
+  border-radius: 0 var(--nl-radius-tiny) var(--nl-radius-tiny) 0;
   opacity: 0.95;
   transition: all var(--nl-animation-fast) var(--nl-easing);
 }
@@ -339,7 +324,7 @@ window {
   padding: 8px 0;
   border-top: 1px solid var(--nl-border);
   background-color: transparent;
-  border-radius: 0 0 20px 20px;
+  border-radius: 0 0 var(--nl-radius-window) var(--nl-radius-window);
 }
 
 .hint-text {
@@ -347,7 +332,7 @@ window {
   color: var(--nl-text-tertiary);
   font-weight: 500;
   padding: 6px 12px;
-  border-radius: 8px;
+  border-radius: var(--nl-radius-tiny);
   transition: all var(--nl-animation-fast) var(--nl-easing);
 }
 
@@ -454,9 +439,9 @@ window {
   }
 }
 
-/* Smooth opacity transition on hover (removed animation as GTK reuses rows) */
+/* Smooth opacity transition on hover */
 listbox row {
-  opacity: 0.95;
+  opacity: 1;
   transition: opacity var(--nl-animation-fast) var(--nl-easing),
     background-color var(--nl-animation-fast) var(--nl-easing),
     transform var(--nl-animation-fast) var(--nl-easing),
@@ -471,11 +456,6 @@ listbox row:selected {
 /* Apply subtle scale on selection for visual feedback */
 listbox row:selected {
   transform: scale(1.02);
-}
-
-/* Window appearance animation */
-window {
-  animation: windowAppear var(--nl-animation-slow) var(--nl-easing);
 }
 
 /* Smooth transition for all interactive elements */
@@ -527,15 +507,11 @@ listbox row:selected image {
   border-top: 1px solid var(--nl-border);
   padding: 12px 24px;
   margin: 0 16px 16px 16px;
-  border-radius: 16px;
+  border-radius: var(--nl-radius-large);
   min-height: 44px;
-  opacity: 0;
+  opacity: 1;
   transition: opacity var(--nl-animation-normal) var(--nl-easing);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.search-footer:visible {
-  opacity: 1;
 }
 
 .search-footer-text {
@@ -545,11 +521,30 @@ listbox row:selected image {
   letter-spacing: 0.2px;
 }
 
+.search-footer-accent {
+  color: var(--nl-primary);
+  font-weight: 600;
+}
+
+.search-footer-loading {
+  color: var(--nl-primary);
+  font-weight: 600;
+}
+
+.search-footer-query {
+  color: var(--nl-text-secondary);
+  font-style: italic;
+}
+
+.search-footer-browser {
+  color: var(--nl-text-secondary);
+}
+
 /* === Plugin Warning === */
 .plugin-warning {
   background-color: rgba(255, 159, 10, 0.15);
   border: 1px solid rgba(255, 159, 10, 0.3);
-  border-radius: 12px;
+  border-radius: var(--nl-radius-small);
   padding: 10px 16px;
   margin: 12px 16px 0 16px;
   transition: all var(--nl-animation-fast) var(--nl-easing);

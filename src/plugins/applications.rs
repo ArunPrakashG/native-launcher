@@ -111,8 +111,13 @@ impl Plugin for ApplicationsPlugin {
         vec!["@app"]
     }
 
-    fn should_handle(&self, _query: &str) -> bool {
-        // Applications plugin handles all queries (fallback)
+    fn should_handle(&self, query: &str) -> bool {
+        // Don't interfere with other @ commands (unless it's @app)
+        if query.starts_with('@') {
+            return query.starts_with("@app");
+        }
+
+        // Applications plugin handles all non-@ queries (fallback)
         true
     }
 

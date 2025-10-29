@@ -2,10 +2,13 @@ use crate::desktop::{DesktopAction, DesktopEntry};
 use crate::plugins::PluginResult;
 use crate::utils::icons::resolve_icon;
 use gtk4::prelude::*;
-use gtk4::{Box as GtkBox, Image, Label, ListBox, Orientation, ScrolledWindow};
+use gtk4::{
+    pango::EllipsizeMode, Box as GtkBox, Image, Label, ListBox, Orientation, ScrolledWindow,
+};
 use std::cell::RefCell;
+use std::path::PathBuf;
 use std::rc::Rc;
-use tracing::info;
+use tracing::{debug, info};
 
 /// Represents an item in the results list
 /// SIMPLIFIED: Each item maps directly to what you see and click
@@ -40,10 +43,20 @@ impl ResultsList {
             .build();
 
         let container = ScrolledWindow::builder()
-            .hexpand(true)
-            .vexpand(true)
             .child(&list)
+            .has_frame(false) // No frame for clean rounded corners
             .build();
+
+        // Removed hexpand/vexpand - window is fixed size, should not expand
+
+        // Ensure scrolling policies are set correctly
+        container.set_policy(gtk4::PolicyType::Never, gtk4::PolicyType::Automatic);
+
+        // CRITICAL: Set fixed size to prevent expansion/shrinking
+        // This ensures the scrolled window always maintains 400px height
+        container.set_size_request(-1, 400); // -1 for width (use available), 400px height
+        container.set_vexpand(false); // Don't expand vertically
+        container.set_hexpand(false); // Don't expand horizontally
 
         Self {
             container,
@@ -57,18 +70,22 @@ impl ResultsList {
 
     pub fn update_results(&self, results: Vec<&DesktopEntry>) {
         // Build flat list: apps + their actions inline
-        let mut items = Vec::new();
+        // Pre-allocate capacity (estimate: 1 app + average 1 action per app)
+        let mut items = Vec::with_capacity(results.len() * 2);
+
         for entry in results.iter() {
-            let entry = (*entry).clone();
+            // Clone entry once for all uses
+            let entry_owned = (*entry).clone();
+
             items.push(ListItem::App {
-                entry: entry.clone(),
+                entry: entry_owned.clone(),
             });
 
             // Add actions directly under the app
-            for action in entry.actions.iter() {
+            for action in entry_owned.actions.iter() {
                 items.push(ListItem::Action {
                     action: action.clone(),
-                    parent_entry: entry.clone(),
+                    parent_entry: entry_owned.clone(),
                 });
             }
         }
@@ -93,9 +110,9 @@ impl ResultsList {
             .map(|result| ListItem::PluginResult { result })
             .collect();
 
-        // Add to existing items
+        // Add to existing items - no need to clone, we can move
         let mut items = self.items.borrow_mut();
-        items.extend(new_items.clone());
+        items.extend(new_items.iter().cloned()); // Clone only references, not the vec
         drop(items);
 
         // Render only the new items to the UI
@@ -108,16 +125,19 @@ impl ResultsList {
     fn render_items(&self, items: Vec<ListItem>) {
         tracing::debug!("Rendering {} items", items.len());
 
-        *self.items.borrow_mut() = items.clone();
+        // Store items for later use (e.g., getting selected command)
+        *self.items.borrow_mut() = items;
 
-        // Clear existing items
+        // Clear existing items from UI
         while let Some(child) = self.list.first_child() {
             self.list.remove(&child);
         }
 
-        // Create a row for each item
-        for item in items {
-            self.render_single_item(item);
+        // Render items from stored copy (borrow and clone individual items as needed)
+        // This is more efficient than cloning the entire Vec upfront
+        for item in self.items.borrow().iter() {
+            // Clone individual items only when rendering (GTK requires ownership)
+            self.render_single_item(item.clone());
         }
 
         // Select first row if available
@@ -217,6 +237,10 @@ impl ResultsList {
             .xalign(0.0)
             .build();
         name_label.add_css_class("action-name");
+        name_label.set_hexpand(true);
+        name_label.set_wrap(false);
+        name_label.set_ellipsize(EllipsizeMode::End);
+        name_label.set_max_width_chars(60);
 
         content_box.append(&name_label);
         row.append(&content_box);
@@ -240,14 +264,10 @@ impl ResultsList {
 
         // Add icon (with fallback to default icon)
         let icon_size = if is_linked_entry { 32 } else { 48 };
-        let icon_path = result
-            .icon
-            .as_ref()
-            .and_then(|name| resolve_icon(name))
-            .or_else(|| {
-                use crate::utils::icons::get_default_icon;
-                Some(get_default_icon())
-            });
+        let icon_path = Self::resolve_plugin_icon(result).or_else(|| {
+            use crate::utils::icons::get_default_icon;
+            Some(get_default_icon())
+        });
 
         if let Some(icon_path) = icon_path {
             let image = Image::from_file(&icon_path);
@@ -275,6 +295,10 @@ impl ResultsList {
             .xalign(0.0)
             .build();
         name_label.add_css_class("app-name");
+        name_label.set_hexpand(true);
+        name_label.set_wrap(false);
+        name_label.set_ellipsize(EllipsizeMode::End);
+        name_label.set_max_width_chars(60);
 
         content_box.append(&name_label);
 
@@ -286,6 +310,10 @@ impl ResultsList {
                 .xalign(0.0)
                 .build();
             subtitle_label.add_css_class("app-generic");
+            subtitle_label.set_hexpand(true);
+            subtitle_label.set_wrap(false);
+            subtitle_label.set_ellipsize(EllipsizeMode::End);
+            subtitle_label.set_max_width_chars(60);
             content_box.append(&subtitle_label);
         }
 
@@ -337,6 +365,10 @@ impl ResultsList {
             .xalign(0.0)
             .build();
         name_label.add_css_class("app-name");
+        name_label.set_hexpand(true);
+        name_label.set_wrap(false);
+        name_label.set_ellipsize(EllipsizeMode::End);
+        name_label.set_max_width_chars(60);
 
         content_box.append(&name_label);
 
@@ -348,6 +380,10 @@ impl ResultsList {
                 .xalign(0.0)
                 .build();
             generic_label.add_css_class("dim-label");
+            generic_label.set_hexpand(true);
+            generic_label.set_wrap(false);
+            generic_label.set_ellipsize(EllipsizeMode::End);
+            generic_label.set_max_width_chars(60);
             content_box.append(&generic_label);
         }
 
@@ -366,12 +402,16 @@ impl ResultsList {
         if let Some(current) = self.list.selected_row() {
             let next_index = current.index() + 1;
 
+            // Check if there's actually a next row before doing anything
             if let Some(next_row) = self.list.row_at_index(next_index) {
                 self.list.select_row(Some(&next_row));
                 // Auto-scroll to make the selected row visible
                 self.scroll_to_selected();
 
                 info!("Selected next row (index {})", next_index);
+            } else {
+                // Already at the last item, do nothing to avoid unnecessary computation
+                debug!("Already at last item, ignoring Down arrow");
             }
         }
     }
@@ -388,7 +428,13 @@ impl ResultsList {
                     self.scroll_to_selected();
 
                     info!("Selected previous row (index {})", prev_index);
+                } else {
+                    // Already at the first item, do nothing
+                    debug!("Already at first item, ignoring Up arrow");
                 }
+            } else {
+                // Already at the first item (index 0), do nothing
+                debug!("Already at first item, ignoring Up arrow");
             }
         }
     }
@@ -418,6 +464,53 @@ impl ResultsList {
                     (selected_y + row_height + padding - viewport_height).min(max_scroll);
                 vadj.set_value(new_value);
             }
+        }
+    }
+}
+
+impl ResultsList {
+    fn resolve_plugin_icon(result: &PluginResult) -> Option<PathBuf> {
+        if let Some(icon_name) = result.icon.as_deref() {
+            if let Some(path) = resolve_icon(icon_name) {
+                return Some(path);
+            }
+        }
+
+        if let Some(parent_app) = result.parent_app.as_deref() {
+            if let Some(path) = Self::resolve_parent_app_icon(parent_app) {
+                return Some(path);
+            }
+        }
+
+        None
+    }
+
+    fn resolve_parent_app_icon(parent_app: &str) -> Option<PathBuf> {
+        for candidate in Self::icon_candidates_for_parent(parent_app) {
+            if let Some(path) = resolve_icon(candidate) {
+                return Some(path);
+            }
+        }
+        None
+    }
+
+    fn icon_candidates_for_parent(parent_app: &str) -> &'static [&'static str] {
+        match parent_app {
+            "code" | "Code" | "vscode" | "Visual Studio Code" => &[
+                "com.visualstudio.code",
+                "com.visualstudio.code-oss",
+                "code",
+                "visual-studio-code",
+                "vscode",
+            ],
+            "codium" | "Codium" | "vscodium" | "VSCodium" => {
+                &["com.vscodium.codium", "vscodium", "codium"]
+            }
+            "subl" | "Subl" | "sublime" | "Sublime" | "sublime-text" => {
+                &["sublime-text", "com.sublimetext.three", "subl"]
+            }
+            "zed" | "Zed" => &["dev.zed.Zed", "zed"],
+            _ => &[],
         }
     }
 }

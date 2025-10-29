@@ -289,8 +289,12 @@ impl Plugin for FileBrowserPlugin {
             return false;
         }
 
+        // Don't interfere with other @ commands (unless it's @file or @recent)
+        if query.starts_with('@') {
+            return query.starts_with("@file") || query.starts_with("@recent");
+        }
+
         // Always participate in global search (query length >= 2 for performance)
-        // But be smart about what we search
         query.len() >= 2
     }
 

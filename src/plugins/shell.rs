@@ -106,8 +106,11 @@ mod tests {
 
     #[test]
     fn test_search() {
+        use crate::config::Config;
+
         let shell = ShellPlugin::new();
-        let ctx = PluginContext::new(10);
+        let config = Config::default();
+        let ctx = PluginContext::new(10, &config);
 
         let results = shell.search(">ls -la", &ctx).unwrap();
         assert_eq!(results.len(), 1);

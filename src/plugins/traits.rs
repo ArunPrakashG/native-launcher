@@ -1,3 +1,4 @@
+use crate::config::Config;
 use anyhow::Result;
 use gtk4::gdk::{Key, ModifierType};
 use std::fmt::Debug;
@@ -80,6 +81,7 @@ pub struct PluginResult {
     /// Search score (higher = better match)
     pub score: i64,
     /// Plugin that generated this result
+    #[allow(dead_code)] // Used in tests
     pub plugin_name: String,
     /// Sub-results (e.g., workspaces under VS Code app)
     pub sub_results: Vec<PluginResult>,
@@ -157,21 +159,27 @@ impl PluginResult {
 
 /// Context provided to plugins during search
 #[derive(Debug, Clone)]
-pub struct PluginContext {
+/// Context passed to plugins during search
+/// Provides access to search parameters and read-only configuration
+pub struct PluginContext<'a> {
     /// Maximum number of results requested
     pub max_results: usize,
     /// Whether to include low-score results
     pub include_low_scores: bool,
     /// Number of high-quality app results found so far (for smart triggering)
     pub app_results_count: usize,
+    /// Read-only access to application configuration
+    #[allow(dead_code)] // Available for plugins to access config
+    pub config: &'a Config,
 }
 
-impl PluginContext {
-    pub fn new(max_results: usize) -> Self {
+impl<'a> PluginContext<'a> {
+    pub fn new(max_results: usize, config: &'a Config) -> Self {
         Self {
             max_results,
             include_low_scores: false,
             app_results_count: 0,
+            config,
         }
     }
 

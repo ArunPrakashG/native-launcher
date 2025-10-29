@@ -71,6 +71,18 @@ pub struct EditorsPlugin {
 }
 
 impl EditorsPlugin {
+    const COMMAND_PREFIXES: [&'static str; 4] = ["@code", "@workspace", "@editor", "@zed"];
+
+    fn icon_for_editor(editor: &str) -> Option<&'static str> {
+        match editor {
+            "code" => Some("com.visualstudio.code"),
+            "codium" => Some("com.vscodium.codium"),
+            "subl" => Some("sublime-text"),
+            "zed" => Some("dev.zed.Zed"),
+            _ => None,
+        }
+    }
+
     /// Create a new editors plugin
     pub fn new(enabled: bool) -> Self {
         let recent_workspaces = Self::load_recent_workspaces(50).unwrap_or_else(|e| {
@@ -574,11 +586,11 @@ impl Plugin for EditorsPlugin {
     }
 
     fn description(&self) -> &str {
-        "Code editor workspaces (VS Code, VSCodium, Sublime, Zed)"
+        "Code editor workspaces (VS Code, VSCodium, Sublime, Zed) - Use @workspace, @code, @zed, or @editor"
     }
 
     fn command_prefixes(&self) -> Vec<&str> {
-        vec!["@code", "@zed", "@editor"]
+        vec!["@code", "@workspace", "@zed", "@editor"]
     }
 
     fn priority(&self) -> i32 {
@@ -594,8 +606,20 @@ impl Plugin for EditorsPlugin {
             return false;
         }
 
-        // Handle explicit commands or participate in global search for short queries
-        query.starts_with('@') || query.len() >= 2
+        let query_lower = query.to_lowercase();
+        let trimmed = query_lower.trim();
+
+        if trimmed.is_empty() {
+            return false;
+        }
+
+        if trimmed.starts_with('@') {
+            return Self::COMMAND_PREFIXES
+                .iter()
+                .any(|prefix| trimmed.starts_with(prefix));
+        }
+
+        trimmed.len() >= 2
     }
 
     fn search(&self, query: &str, context: &PluginContext) -> Result<Vec<PluginResult>> {
@@ -604,37 +628,39 @@ impl Plugin for EditorsPlugin {
         }
 
         let query_lower = query.to_lowercase();
-        let mut results = Vec::new();
+        let trimmed_query = query_lower.trim();
+        let command_prefix = Self::COMMAND_PREFIXES
+            .iter()
+            .find(|prefix| trimmed_query.starts_with(*prefix));
+        let is_editor_command = command_prefix.is_some();
 
-        // Extract search term
-        let is_command_query = query.starts_with('@');
-        let search_term = if is_command_query {
-            query_lower
-                .strip_prefix("@code")
-                .or_else(|| query_lower.strip_prefix("@zed"))
-                .or_else(|| query_lower.strip_prefix("@editor"))
-                .unwrap_or(&query_lower)
-                .trim()
+        // If the query is another plugin command (starts with '@' but not ours), bail out early
+        if trimmed_query.starts_with('@') && !is_editor_command {
+            return Ok(Vec::new());
+        }
+
+        let search_term = if let Some(prefix) = command_prefix {
+            trimmed_query[prefix.len()..].trim()
         } else {
-            query_lower.trim()
+            trimmed_query
         };
 
-        // For global search, only show workspaces if query is short (3 chars or less) or if there's a match
-        let show_all_workspaces =
-            is_command_query || search_term.is_empty() || search_term.len() <= 3;
+        let mut results = Vec::new();
 
         for workspace in &self.recent_workspaces {
-            // Filter by search term - but be more permissive for short queries
-            let matches = search_term.is_empty()
-                || workspace.name.to_lowercase().contains(search_term)
-                || workspace
-                    .path
-                    .to_string_lossy()
-                    .to_lowercase()
-                    .contains(search_term);
+            let name_lower = workspace.name.to_lowercase();
+            let editor_lower = workspace.editor.to_lowercase();
+            let path_lower = workspace.path.to_string_lossy().to_lowercase();
 
-            // Skip non-matching workspaces unless we're showing all
-            if !show_all_workspaces && !matches {
+            let matches = if search_term.is_empty() {
+                is_editor_command
+            } else {
+                name_lower.contains(search_term)
+                    || editor_lower.contains(search_term)
+                    || path_lower.contains(search_term)
+            };
+
+            if !matches {
                 continue;
             }
 
@@ -645,23 +671,38 @@ impl Plugin for EditorsPlugin {
             ));
 
             // Score based on match quality
-            let score = if matches && !search_term.is_empty() {
-                if workspace.name.to_lowercase() == search_term {
-                    850 // Exact match
-                } else if workspace.name.to_lowercase().starts_with(search_term) {
-                    820 // Prefix match
+            let score = if search_term.is_empty() {
+                if is_editor_command {
+                    650
                 } else {
-                    800 // Contains match
+                    580
                 }
             } else {
-                // No filter active, lower score to not interfere with app results
-                580
+                if name_lower == search_term {
+                    850
+                } else if name_lower.starts_with(search_term) {
+                    820
+                } else if name_lower.contains(search_term) {
+                    800
+                } else if editor_lower == search_term {
+                    780
+                } else if editor_lower.starts_with(search_term) {
+                    770
+                } else if editor_lower.contains(search_term) {
+                    760
+                } else if path_lower.contains(search_term) {
+                    720
+                } else {
+                    580
+                }
             };
+
+            let icon = Self::icon_for_editor(&workspace.editor).map(str::to_string);
 
             results.push(PluginResult {
                 title: workspace.name.clone(),
                 subtitle,
-                icon: None, // Icon will be resolved from parent_app
+                icon,
                 command: workspace.command.clone(),
                 terminal: false,
                 score,

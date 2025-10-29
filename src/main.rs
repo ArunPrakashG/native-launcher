@@ -17,9 +17,9 @@ use gtk4::{Application, Box as GtkBox, Orientation};
 use plugins::{KeyboardAction, KeyboardEvent, PluginManager};
 use std::cell::RefCell;
 use std::rc::Rc;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 use tracing_subscriber::EnvFilter;
-use ui::{load_theme, KeyboardHints, LauncherWindow, ResultsList, SearchWidget};
+use ui::{load_theme_with_name, KeyboardHints, LauncherWindow, ResultsList, SearchWidget};
 use usage::UsageTracker;
 use utils::{detect_web_search, execute_command, get_default_browser};
 
@@ -155,19 +155,25 @@ fn build_ui(
 ) -> Result<()> {
     info!("Building UI");
 
-    // Load CSS theme
-    load_theme();
+    // Load CSS theme from config
+    info!("Loading theme: {}", config.ui.theme);
+    load_theme_with_name(&config.ui.theme);
+
+    let merge_login_env = config.environment.merge_login_env;
 
     // Create main window with config
     let launcher_window = LauncherWindow::new(app);
 
-    // Apply window config
+    // Apply window config - use FIXED size to prevent expansion
     launcher_window
         .window
         .set_default_width(config.window.width);
     launcher_window
         .window
         .set_default_height(config.window.height);
+
+    // CRITICAL: Prevent window from resizing beyond default size
+    launcher_window.window.set_resizable(false);
 
     // Create search widget
     let search_widget = SearchWidget::new();
@@ -235,6 +241,10 @@ fn build_ui(
         .spacing(10)
         .build();
 
+    // CRITICAL: Prevent container from expanding/shrinking
+    main_box.set_vexpand(false);
+    main_box.set_hexpand(false);
+
     // Add plugin warning at the top if there are slow plugins
     if let Some(warning) = plugin_warning {
         main_box.append(&warning);
@@ -247,38 +257,25 @@ fn build_ui(
 
     launcher_window.window.set_child(Some(&main_box));
 
-    // Initial results - check config for empty state behavior
-    let max_results = config.search.max_results;
-    let empty_state_on_launch = config.ui.empty_state_on_launch;
-
-    if !empty_state_on_launch {
-        // Traditional behavior: show all apps on launch
-        match plugin_manager.borrow().search("", max_results) {
-            Ok(initial_results) => results_list.update_plugin_results(initial_results),
-            Err(e) => error!("Failed to get initial results: {}", e),
+    // Initial results - show recently used apps and top applications (20 items)
+    info!("Loading default results (recent + top apps)...");
+    match plugin_manager.borrow().search("", 20) {
+        Ok(default_results) => {
+            info!("Showing {} default results", default_results.len());
+            results_list.update_plugin_results(default_results);
         }
-    } else {
-        // Spotlight-style: start with empty list
-        results_list.update_plugin_results(Vec::new());
-        // Hide results container initially
-        results_list.container.set_visible(false);
-        // Hide footer and keyboard hints initially
-        search_footer.container.set_visible(false);
-        keyboard_hints.container.set_visible(false);
-        // Collapse window to show only search input
-        launcher_window.window.set_default_height(120);
+        Err(e) => {
+            error!("Failed to get default results: {}", e);
+            results_list.update_plugin_results(Vec::new());
+        }
     }
 
     // Handle search text changes with debouncing to prevent lag
     {
         let results_list = results_list.clone();
         let search_footer_clone = search_footer.clone();
-        let keyboard_hints_clone = keyboard_hints.clone();
         let plugin_manager = plugin_manager.clone();
         let max_results = config.search.max_results;
-        let empty_state_on_launch = config.ui.empty_state_on_launch;
-        let window_clone = launcher_window.window.clone();
-        let full_height = config.window.height;
 
         // Debounce timeout holder and cancellation flag
         // We use a counter instead of removing sources to avoid GTK panics
@@ -286,23 +283,6 @@ fn build_ui(
 
         search_widget.entry.connect_changed(move |entry| {
             let query = entry.text().to_string();
-
-            // Show/hide results container based on empty state config
-            if empty_state_on_launch {
-                if query.is_empty() {
-                    results_list.container.set_visible(false);
-                    search_footer_clone.container.set_visible(false);
-                    keyboard_hints_clone.container.set_visible(false);
-                    // Collapse window to compact size
-                    window_clone.set_default_height(120);
-                } else {
-                    results_list.container.set_visible(true);
-                    search_footer_clone.container.set_visible(true);
-                    keyboard_hints_clone.container.set_visible(true);
-                    // Expand window to full size
-                    window_clone.set_default_height(full_height);
-                }
-            }
 
             // IMMEDIATE: Update web search footer (no delay)
             // This gives instant visual feedback even with debouncing
@@ -434,7 +414,7 @@ fn build_ui(
                         // This ensures the new app gets focus and appears in foreground
                         window_clone.close();
 
-                        if let Err(e) = execute_command(&exec, terminal) {
+                        if let Err(e) = execute_command(&exec, terminal, merge_login_env) {
                             error!("Failed to launch {}: {}", exec, e);
                         }
                     }
@@ -445,7 +425,9 @@ fn build_ui(
                     // IMPORTANT: Hide window BEFORE opening URL
                     window_clone.close();
 
-                    if let Err(e) = execute_command(&format!("xdg-open '{}'", url), false) {
+                    if let Err(e) =
+                        execute_command(&format!("xdg-open '{}'", url), false, merge_login_env)
+                    {
                         error!("Failed to open URL: {}", e);
                     }
                 }
@@ -455,7 +437,7 @@ fn build_ui(
                     // IMPORTANT: Hide window BEFORE executing command
                     window_clone.close();
 
-                    if let Err(e) = execute_command(&command, terminal) {
+                    if let Err(e) = execute_command(&command, terminal, merge_login_env) {
                         error!("Failed to execute command: {}", e);
                     }
                 }
@@ -486,11 +468,29 @@ fn build_ui(
                 Key::Down => {
                     // Move selection down
                     results_list_clone.select_next();
+
+                    // Preview theme if a theme item is selected
+                    if let Some((command, _)) = results_list_clone.get_selected_command() {
+                        if let Some(theme_name) = command.strip_prefix("@theme:") {
+                            info!("Previewing theme: {}", theme_name);
+                            load_theme_with_name(theme_name);
+                        }
+                    }
+
                     gtk4::glib::Propagation::Stop
                 }
                 Key::Up => {
                     // Move selection up
                     results_list_clone.select_previous();
+
+                    // Preview theme if a theme item is selected
+                    if let Some((command, _)) = results_list_clone.get_selected_command() {
+                        if let Some(theme_name) = command.strip_prefix("@theme:") {
+                            info!("Previewing theme: {}", theme_name);
+                            load_theme_with_name(theme_name);
+                        }
+                    }
+
                     gtk4::glib::Propagation::Stop
                 }
                 Key::Return => {
@@ -511,6 +511,30 @@ fn build_ui(
                             if let Some((exec, terminal)) =
                                 results_list_clone.get_selected_command()
                             {
+                                // Special handling for theme switcher commands
+                                if exec.starts_with("@theme:") {
+                                    if let Some(theme_name) = exec.strip_prefix("@theme:") {
+                                        info!("Switching to theme: {}", theme_name);
+                                        load_theme_with_name(theme_name);
+
+                                        // Persist theme selection to config file
+                                        use config::ConfigLoader;
+                                        if let Ok(mut loader) = ConfigLoader::load() {
+                                            let mut updated_config = loader.config().clone();
+                                            updated_config.ui.theme = theme_name.to_string();
+
+                                            if let Err(e) = loader.update(updated_config) {
+                                                warn!("Failed to persist theme to config: {}", e);
+                                            } else {
+                                                info!("Theme '{}' saved to config", theme_name);
+                                            }
+                                        }
+
+                                        // Don't close window - let user see theme change
+                                        return gtk4::glib::Propagation::Stop;
+                                    }
+                                }
+
                                 info!("Launching: {}", exec);
 
                                 // Track usage
@@ -523,7 +547,7 @@ fn build_ui(
                                 // This ensures the new app gets focus and appears in foreground
                                 window_clone.close();
 
-                                if let Err(e) = execute_command(&exec, terminal) {
+                                if let Err(e) = execute_command(&exec, terminal, merge_login_env) {
                                     error!("Failed to launch {}: {}", exec, e);
                                 }
                             }
@@ -534,7 +558,11 @@ fn build_ui(
                             // IMPORTANT: Hide window BEFORE opening URL
                             window_clone.close();
 
-                            if let Err(e) = execute_command(&format!("xdg-open '{}'", url), false) {
+                            if let Err(e) = execute_command(
+                                &format!("xdg-open '{}'", url),
+                                false,
+                                merge_login_env,
+                            ) {
                                 error!("Failed to open URL: {}", e);
                             }
                         }
@@ -544,7 +572,7 @@ fn build_ui(
                             // IMPORTANT: Hide window BEFORE executing command
                             window_clone.close();
 
-                            if let Err(e) = execute_command(&command, terminal) {
+                            if let Err(e) = execute_command(&command, terminal, merge_login_env) {
                                 error!("Failed to execute command: {}", e);
                             }
                         }
@@ -561,6 +589,25 @@ fn build_ui(
         });
 
         launcher_window.window.add_controller(key_controller);
+    }
+
+    // Add key handler to search entry to prevent it from consuming Up/Down arrows
+    // This ensures arrow keys always navigate results, not cursor position
+    {
+        let entry_key_controller = gtk4::EventControllerKey::new();
+
+        entry_key_controller.connect_key_pressed(move |_, key, _, _| {
+            match key {
+                Key::Up | Key::Down => {
+                    // Let these keys propagate to the window controller
+                    // which will handle result navigation
+                    gtk4::glib::Propagation::Proceed
+                }
+                _ => gtk4::glib::Propagation::Proceed,
+            }
+        });
+
+        search_widget.entry.add_controller(entry_key_controller);
     }
 
     // Show window
