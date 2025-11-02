@@ -36,6 +36,9 @@ impl KeyboardHints {
             "<span size='small' alpha='60%'>\
             <b>↑↓</b> Navigate  •  \
             <b>↵</b> Launch  •  \
+            <b>Alt+↵</b> Folder  •  \
+            <b>Ctrl+↵</b> Copy Path  •  \
+            <b>Ctrl+P</b> Pin  •  \
             <b>ESC</b> Close\
             </span>",
         )
@@ -48,6 +51,9 @@ impl KeyboardHints {
             "<span size='small' alpha='60%'>\
             <b>↑↓</b> Navigate  •  \
             <b>↵</b> Run Action  •  \
+            <b>Ctrl+1</b> First  •  \
+            <b>Ctrl+P</b> Pin  •  \
+            <b>Ctrl+Enter</b> Web  •  \
             <b>←</b> Back  •  \
             <b>ESC</b> Close\
             </span>",

@@ -151,6 +151,7 @@ impl Plugin for WebSearchPlugin {
             )
             .with_subtitle(url.clone())
             .with_icon("web-browser".to_string())
+            .with_badge_icon("web-browser-symbolic".to_string())
             .with_score(9000)]); // High score for explicit web searches
         }
 
@@ -171,6 +172,7 @@ impl Plugin for WebSearchPlugin {
         )
         .with_subtitle(url.clone())
         .with_icon("web-browser".to_string())
+        .with_badge_icon("web-browser-symbolic".to_string())
         .with_score(100)]) // Low score so it appears at the bottom
     }
 

@@ -245,6 +245,13 @@ impl FileBrowserPlugin {
 
                 let open_command = build_open_command(path.to_string_lossy());
 
+                // Determine badge based on file type
+                let badge_icon = if path.is_dir() {
+                    Some("folder-symbolic".to_string())
+                } else {
+                    Some("document-symbolic".to_string())
+                };
+
                 results.push(PluginResult {
                     title: display_name,
                     subtitle: Some(subtitle),
@@ -255,6 +262,8 @@ impl FileBrowserPlugin {
                     plugin_name: "files".to_string(),
                     sub_results: Vec::new(),
                     parent_app: None,
+                    desktop_path: None,
+                    badge_icon,
                 });
 
                 if results.len() >= max_results {
@@ -376,6 +385,13 @@ impl Plugin for FileBrowserPlugin {
 
                 let open_command = build_open_command(file.path.to_string_lossy());
 
+                // Determine badge based on file type
+                let badge_icon = if file.path.is_dir() {
+                    Some("folder-symbolic".to_string())
+                } else {
+                    Some("document-symbolic".to_string())
+                };
+
                 results.push(PluginResult {
                     title: file.name.clone(),
                     subtitle,
@@ -386,6 +402,8 @@ impl Plugin for FileBrowserPlugin {
                     plugin_name: self.name().to_string(),
                     sub_results: Vec::new(),
                     parent_app: None,
+                    desktop_path: None,
+                    badge_icon,
                 });
 
                 if results.len() >= context.max_results {
@@ -498,6 +516,13 @@ impl Plugin for FileBrowserPlugin {
                                 base_score // Contains match
                             };
 
+                            // Determine badge based on file type
+                            let badge_icon = if path.is_dir() {
+                                Some("folder-symbolic".to_string())
+                            } else {
+                                Some("document-symbolic".to_string())
+                            };
+
                             results.push(PluginResult {
                                 title: file_name,
                                 subtitle,
@@ -508,6 +533,8 @@ impl Plugin for FileBrowserPlugin {
                                 plugin_name: self.name().to_string(),
                                 sub_results: Vec::new(),
                                 parent_app: None,
+                                desktop_path: None,
+                                badge_icon,
                             });
 
                             if results.len() >= context.max_results {
@@ -526,6 +553,57 @@ impl Plugin for FileBrowserPlugin {
         results.sort_by(|a, b| b.score.cmp(&a.score));
 
         Ok(results)
+    }
+
+    fn handle_keyboard_event(
+        &self,
+        event: &crate::plugins::traits::KeyboardEvent,
+    ) -> crate::plugins::traits::KeyboardAction {
+        use crate::plugins::traits::KeyboardAction;
+        use gtk4::gdk::ModifierType;
+
+        // Only handle if we have a selection
+        if !event.has_selection {
+            return KeyboardAction::None;
+        }
+
+        // Check for Alt key (open containing folder)
+        if event.modifiers.contains(ModifierType::ALT_MASK) && event.key == gtk4::gdk::Key::Return {
+            // Extract path from query if it looks like a file path
+            if event.query.starts_with('/') || event.query.starts_with("~/") {
+                let expanded_path = if event.query.starts_with("~/") {
+                    event.query.replace(
+                        "~",
+                        &std::env::var("HOME").unwrap_or_else(|_| ".".to_string()),
+                    )
+                } else {
+                    event.query.clone()
+                };
+
+                return KeyboardAction::OpenFolder(expanded_path);
+            }
+        }
+
+        // Check for Ctrl key (copy path)
+        if event.modifiers.contains(ModifierType::CONTROL_MASK)
+            && event.key == gtk4::gdk::Key::Return
+        {
+            // Extract path from query if it looks like a file path
+            if event.query.starts_with('/') || event.query.starts_with("~/") {
+                let expanded_path = if event.query.starts_with("~/") {
+                    event.query.replace(
+                        "~",
+                        &std::env::var("HOME").unwrap_or_else(|_| ".".to_string()),
+                    )
+                } else {
+                    event.query.clone()
+                };
+
+                return KeyboardAction::CopyPath(expanded_path);
+            }
+        }
+
+        KeyboardAction::None
     }
 }
 

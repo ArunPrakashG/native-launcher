@@ -14,6 +14,7 @@ pub struct ScreenshotPlugin {
     output_dir: PathBuf,
     enabled: bool,
     clipboard: Option<ClipboardTool>,
+    annotator: Option<AnnotatorTool>,
 }
 
 impl ScreenshotPlugin {
@@ -21,6 +22,7 @@ impl ScreenshotPlugin {
         let backend = detect_backend();
         let output_dir = default_output_directory();
         let clipboard = detect_clipboard_tool();
+        let annotator = detect_annotator_tool();
 
         if let Some(ref backend) = backend {
             debug!(
@@ -40,11 +42,21 @@ impl ScreenshotPlugin {
             debug!("screenshot plugin did not detect a clipboard utility");
         }
 
+        if let Some(ref annotator) = annotator {
+            debug!(
+                "screenshot plugin will support annotation using {}",
+                annotator.display_name()
+            );
+        } else {
+            debug!("screenshot plugin did not detect an annotation tool");
+        }
+
         Self {
             backend,
             output_dir,
             enabled: true,
             clipboard,
+            annotator,
         }
     }
 
@@ -55,6 +67,7 @@ impl ScreenshotPlugin {
             output_dir,
             enabled: true,
             clipboard: None,
+            annotator: None,
         }
     }
 
@@ -92,6 +105,9 @@ impl ScreenshotPlugin {
             ScreenshotMode::Fullscreen => 9900,
             ScreenshotMode::Window => 9850,
             ScreenshotMode::Area => 9800,
+            ScreenshotMode::AnnotateFullscreen => 9750,
+            ScreenshotMode::AnnotateWindow => 9700,
+            ScreenshotMode::AnnotateArea => 9650,
         };
 
         let filter_bonus = if has_filter { 200 } else { 0 };
@@ -160,7 +176,20 @@ impl Plugin for ScreenshotPlugin {
         self.ensure_output_dir()?;
 
         let filter = self.strip_prefix(query).trim().to_lowercase();
-        let modes = backend.supported_modes();
+        let mut modes = backend.supported_modes();
+
+        // Add annotation modes if annotator is available
+        if self.annotator.is_some() {
+            // Check if backend supports the corresponding capture mode
+            for capture_mode in backend.supported_modes() {
+                match capture_mode {
+                    ScreenshotMode::Fullscreen => modes.push(ScreenshotMode::AnnotateFullscreen),
+                    ScreenshotMode::Window => modes.push(ScreenshotMode::AnnotateWindow),
+                    ScreenshotMode::Area => modes.push(ScreenshotMode::AnnotateArea),
+                    _ => {} // Skip annotation modes themselves
+                }
+            }
+        }
 
         let mut results = Vec::new();
 
@@ -172,12 +201,45 @@ impl Plugin for ScreenshotPlugin {
             let output_path = self.build_output_path(*mode);
             let path_string = output_path.to_string_lossy().to_string();
             let escaped_path = shell_escape(&path_string);
+
+            // Check if this is an annotation mode
+            let is_annotation_mode = matches!(
+                mode,
+                ScreenshotMode::AnnotateFullscreen
+                    | ScreenshotMode::AnnotateWindow
+                    | ScreenshotMode::AnnotateArea
+            );
+
             let base_command = match backend.command_for(*mode, &escaped_path) {
                 Some(cmd) => cmd,
                 None => continue,
             };
 
-            let command = if let Some(ref clipboard) = self.clipboard {
+            let command = if is_annotation_mode {
+                // For annotation mode: capture | swappy -f - -o output_path
+                if let Some(ref annotator) = self.annotator {
+                    match annotator {
+                        AnnotatorTool::Swappy {
+                            command: swappy_cmd,
+                        } => {
+                            let annotate_cmd = format!(
+                                "{} | {} -f - -o {}",
+                                base_command, swappy_cmd, escaped_path
+                            );
+                            if let Some(ref clipboard) = self.clipboard {
+                                let copy_command = clipboard.command(&escaped_path);
+                                let combined = format!("{} && {}", annotate_cmd, copy_command);
+                                format!("sh -c {}", shell_escape(&combined))
+                            } else {
+                                format!("sh -c {}", shell_escape(&annotate_cmd))
+                            }
+                        }
+                    }
+                } else {
+                    // Should not happen as we only add annotation modes if annotator exists
+                    continue;
+                }
+            } else if let Some(ref clipboard) = self.clipboard {
                 let copy_command = clipboard.command(&escaped_path);
                 let combined = format!("{} && {}", base_command, copy_command);
                 format!("sh -c {}", shell_escape(&combined))
@@ -186,7 +248,16 @@ impl Plugin for ScreenshotPlugin {
             };
 
             let friendly = friendly_path(&output_path);
-            let mut subtitle = format!("Using {} • saves to {}", backend.display_name(), friendly);
+            let mut subtitle = if is_annotation_mode {
+                format!(
+                    "Using {} + {} • saves to {}",
+                    backend.display_name(),
+                    self.annotator.as_ref().unwrap().display_name(),
+                    friendly
+                )
+            } else {
+                format!("Using {} • saves to {}", backend.display_name(), friendly)
+            };
 
             if let Some(ref clipboard) = self.clipboard {
                 subtitle.push_str(&format!(
@@ -230,6 +301,9 @@ enum ScreenshotMode {
     Fullscreen,
     Window,
     Area,
+    AnnotateFullscreen,
+    AnnotateWindow,
+    AnnotateArea,
 }
 
 impl ScreenshotMode {
@@ -238,6 +312,9 @@ impl ScreenshotMode {
             ScreenshotMode::Fullscreen => "Full Screen",
             ScreenshotMode::Window => "Active Window",
             ScreenshotMode::Area => "Select Area",
+            ScreenshotMode::AnnotateFullscreen => "Annotate Full Screen",
+            ScreenshotMode::AnnotateWindow => "Annotate Active Window",
+            ScreenshotMode::AnnotateArea => "Annotate Area",
         }
     }
 
@@ -246,6 +323,9 @@ impl ScreenshotMode {
             ScreenshotMode::Fullscreen => "full",
             ScreenshotMode::Window => "window",
             ScreenshotMode::Area => "area",
+            ScreenshotMode::AnnotateFullscreen => "annotate-full",
+            ScreenshotMode::AnnotateWindow => "annotate-window",
+            ScreenshotMode::AnnotateArea => "annotate-area",
         }
     }
 
@@ -254,6 +334,9 @@ impl ScreenshotMode {
             ScreenshotMode::Fullscreen => &["full", "screen", "monitor", "entire", "whole"],
             ScreenshotMode::Window => &["window", "focused", "active", "app"],
             ScreenshotMode::Area => &["area", "region", "select", "selection", "frame", "partial"],
+            ScreenshotMode::AnnotateFullscreen => &["annotate", "edit", "draw", "full", "screen"],
+            ScreenshotMode::AnnotateWindow => &["annotate", "edit", "draw", "window"],
+            ScreenshotMode::AnnotateArea => &["annotate", "edit", "draw", "area", "region"],
         }
     }
 
@@ -421,6 +504,39 @@ impl ScreenshotBackend {
                 Some(format!("{} -g \"$({})\" {}", grim, slurp, path))
             }
             (ScreenshotTool::GrimSlurp { .. }, ScreenshotMode::Window) => None,
+            // Annotation modes - capture to stdout and pipe to annotation tool
+            // Note: These commands will be wrapped with annotation tool in the search method
+            (ScreenshotTool::Grimshot { command }, ScreenshotMode::AnnotateFullscreen) => {
+                Some(format!("{} save screen -", command))
+            }
+            (ScreenshotTool::Grimshot { command }, ScreenshotMode::AnnotateWindow) => {
+                Some(format!("{} save window -", command))
+            }
+            (ScreenshotTool::Grimshot { command }, ScreenshotMode::AnnotateArea) => {
+                Some(format!("{} save area -", command))
+            }
+            (ScreenshotTool::Hyprshot { .. }, ScreenshotMode::AnnotateFullscreen) => None,
+            (ScreenshotTool::Hyprshot { .. }, ScreenshotMode::AnnotateWindow) => None,
+            (ScreenshotTool::Hyprshot { .. }, ScreenshotMode::AnnotateArea) => None,
+            (ScreenshotTool::GnomeScreenshot { .. }, ScreenshotMode::AnnotateFullscreen) => None,
+            (ScreenshotTool::GnomeScreenshot { .. }, ScreenshotMode::AnnotateWindow) => None,
+            (ScreenshotTool::GnomeScreenshot { .. }, ScreenshotMode::AnnotateArea) => None,
+            (ScreenshotTool::Spectacle { .. }, ScreenshotMode::AnnotateFullscreen) => None,
+            (ScreenshotTool::Spectacle { .. }, ScreenshotMode::AnnotateWindow) => None,
+            (ScreenshotTool::Spectacle { .. }, ScreenshotMode::AnnotateArea) => None,
+            (ScreenshotTool::Maim { .. }, ScreenshotMode::AnnotateFullscreen) => None,
+            (ScreenshotTool::Maim { .. }, ScreenshotMode::AnnotateWindow) => None,
+            (ScreenshotTool::Maim { .. }, ScreenshotMode::AnnotateArea) => None,
+            (ScreenshotTool::Scrot { .. }, ScreenshotMode::AnnotateFullscreen) => None,
+            (ScreenshotTool::Scrot { .. }, ScreenshotMode::AnnotateWindow) => None,
+            (ScreenshotTool::Scrot { .. }, ScreenshotMode::AnnotateArea) => None,
+            (ScreenshotTool::GrimSlurp { grim, .. }, ScreenshotMode::AnnotateFullscreen) => {
+                Some(format!("{} -", grim))
+            }
+            (ScreenshotTool::GrimSlurp { grim, slurp }, ScreenshotMode::AnnotateArea) => {
+                Some(format!("{} -g \"$({})\" -", grim, slurp))
+            }
+            (ScreenshotTool::GrimSlurp { .. }, ScreenshotMode::AnnotateWindow) => None,
         }
     }
 }
@@ -430,6 +546,11 @@ enum ClipboardTool {
     WlCopy { command: String },
     Xclip { command: String },
     Xsel { command: String },
+}
+
+#[derive(Debug, Clone)]
+enum AnnotatorTool {
+    Swappy { command: String },
 }
 
 impl ClipboardTool {
@@ -458,6 +579,14 @@ impl ClipboardTool {
             ClipboardTool::WlCopy { .. } => "wl-copy",
             ClipboardTool::Xclip { .. } => "xclip",
             ClipboardTool::Xsel { .. } => "xsel",
+        }
+    }
+}
+
+impl AnnotatorTool {
+    fn display_name(&self) -> &'static str {
+        match self {
+            AnnotatorTool::Swappy { .. } => "swappy",
         }
     }
 }
@@ -546,6 +675,14 @@ fn detect_clipboard_tool() -> Option<ClipboardTool> {
 
     if let Some(cmd) = command_path("xsel") {
         return Some(ClipboardTool::Xsel { command: cmd });
+    }
+
+    None
+}
+
+fn detect_annotator_tool() -> Option<AnnotatorTool> {
+    if let Some(cmd) = command_path("swappy") {
+        return Some(AnnotatorTool::Swappy { command: cmd });
     }
 
     None
@@ -693,6 +830,147 @@ mod tests {
             .as_ref()
             .expect("expected subtitle for screenshot result");
         assert!(subtitle.contains("copies to clipboard"));
+
+        let _ = fs::remove_dir_all(output);
+    }
+
+    #[test]
+    fn provides_annotation_modes_when_annotator_available() {
+        let output = temp_output_dir();
+        let backend = ScreenshotBackend::grimshot("grimshot".to_string());
+        let mut plugin = ScreenshotPlugin::with_backend(Some(backend), output.clone());
+        plugin.annotator = Some(AnnotatorTool::Swappy {
+            command: "swappy".to_string(),
+        });
+
+        let config = Config::default();
+        let ctx = PluginContext::new(10, &config);
+
+        let results = plugin.search("@screenshot", &ctx).unwrap();
+
+        // Should have 3 regular modes + 3 annotation modes = 6 total
+        assert!(
+            results.len() >= 6,
+            "Expected at least 6 modes (3 regular + 3 annotate), got {}",
+            results.len()
+        );
+
+        // Check for annotation modes
+        assert!(results.iter().any(|r| r.title.contains("Annotate Full")));
+        assert!(results.iter().any(|r| r.title.contains("Annotate Active")));
+        assert!(results.iter().any(|r| r.title.contains("Annotate Area")));
+
+        let _ = fs::remove_dir_all(output);
+    }
+
+    #[test]
+    fn annotation_command_includes_swappy() {
+        let output = temp_output_dir();
+        let backend = ScreenshotBackend::grimshot("grimshot".to_string());
+        let mut plugin = ScreenshotPlugin::with_backend(Some(backend), output.clone());
+        plugin.annotator = Some(AnnotatorTool::Swappy {
+            command: "swappy".to_string(),
+        });
+
+        let config = Config::default();
+        let ctx = PluginContext::new(10, &config);
+
+        let results = plugin.search("@ss annotate", &ctx).unwrap();
+        assert!(!results.is_empty());
+
+        // Find an annotation result
+        let annotate_result = results
+            .iter()
+            .find(|r| r.title.contains("Annotate"))
+            .expect("expected annotation result");
+
+        // Check command contains swappy and pipe
+        assert!(annotate_result.command.contains("swappy"));
+        assert!(annotate_result.command.contains("-f -"));
+        assert!(annotate_result.command.contains("-o"));
+
+        // Check subtitle mentions annotation tool
+        let subtitle = annotate_result
+            .subtitle
+            .as_ref()
+            .expect("expected subtitle for annotation result");
+        assert!(subtitle.contains("swappy"));
+
+        let _ = fs::remove_dir_all(output);
+    }
+
+    #[test]
+    fn annotation_with_clipboard_combines_both() {
+        let output = temp_output_dir();
+        let backend = ScreenshotBackend::grimshot("grimshot".to_string());
+        let mut plugin = ScreenshotPlugin::with_backend(Some(backend), output.clone());
+        plugin.annotator = Some(AnnotatorTool::Swappy {
+            command: "swappy".to_string(),
+        });
+        plugin.clipboard = Some(ClipboardTool::WlCopy {
+            command: "wl-copy".to_string(),
+        });
+
+        let config = Config::default();
+        let ctx = PluginContext::new(10, &config);
+
+        let results = plugin.search("@ss annotate full", &ctx).unwrap();
+        assert!(!results.is_empty());
+
+        let result = &results[0];
+
+        // Check command contains both swappy and clipboard
+        assert!(result.command.contains("swappy"));
+        assert!(result.command.contains("wl-copy"));
+        assert!(result.command.contains("&&"));
+
+        // Check subtitle mentions both tools
+        let subtitle = result.subtitle.as_ref().expect("expected subtitle");
+        assert!(subtitle.contains("swappy"));
+        assert!(subtitle.contains("clipboard"));
+
+        let _ = fs::remove_dir_all(output);
+    }
+
+    #[test]
+    fn filters_annotation_modes_by_keyword() {
+        let output = temp_output_dir();
+        let backend = ScreenshotBackend::grimshot("grimshot".to_string());
+        let mut plugin = ScreenshotPlugin::with_backend(Some(backend), output.clone());
+        plugin.annotator = Some(AnnotatorTool::Swappy {
+            command: "swappy".to_string(),
+        });
+
+        let config = Config::default();
+        let ctx = PluginContext::new(10, &config);
+
+        // Search for "edit" which is in annotation keywords
+        let results = plugin.search("@ss edit", &ctx).unwrap();
+        assert!(!results.is_empty());
+
+        // All results should be annotation modes
+        for result in &results {
+            assert!(result.title.contains("Annotate"));
+        }
+
+        let _ = fs::remove_dir_all(output);
+    }
+
+    #[test]
+    fn no_annotation_modes_without_annotator() {
+        let output = temp_output_dir();
+        let backend = ScreenshotBackend::grimshot("grimshot".to_string());
+        let plugin = ScreenshotPlugin::with_backend(Some(backend), output.clone());
+        // No annotator set
+
+        let config = Config::default();
+        let ctx = PluginContext::new(10, &config);
+
+        let results = plugin.search("@screenshot", &ctx).unwrap();
+
+        // Should only have 3 regular modes
+        assert_eq!(results.len(), 3);
+        assert!(results.iter().all(|r| !r.title.contains("Annotate")));
 
         let _ = fs::remove_dir_all(output);
     }

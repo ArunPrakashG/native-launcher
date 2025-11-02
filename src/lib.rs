@@ -2,6 +2,7 @@
 
 pub mod config;
 pub mod desktop;
+pub mod pins;
 pub mod plugins;
 pub mod search;
 pub mod ui;

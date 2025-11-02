@@ -82,6 +82,8 @@ impl ThemeSwitcherPlugin {
                         plugin_name: "theme-switcher".to_string(),
                         sub_results: vec![],
                         parent_app: None,
+                        desktop_path: None,
+                        badge_icon: None, // No badge for theme switching
                     })
                 } else {
                     None

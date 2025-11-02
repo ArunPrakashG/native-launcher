@@ -171,10 +171,13 @@ impl Default for ConfigLoader {
 mod tests {
     use super::*;
     use crate::config::schema::OpenHandlerConfig;
-    use crate::utils::exec::{configure_open_handlers, handler_counts_for_test};
+    use crate::utils::exec::{
+        configure_open_handlers, handler_counts_for_test, open_handler_test_lock,
+    };
 
     #[test]
     fn test_config_loader_new() {
+        let _guard = open_handler_test_lock().lock().unwrap();
         let before = handler_counts_for_test();
         let loader = ConfigLoader::new();
         assert_eq!(loader.config().window.width, 700);
@@ -185,6 +188,9 @@ mod tests {
 
     #[test]
     fn test_default_path() {
+        // This test doesn't touch handlers, but take the lock for consistency
+        // to avoid interleaving with other tests that might modify global state.
+        let _guard = open_handler_test_lock().lock().unwrap();
         let path = ConfigLoader::default_config_path();
         assert!(path.to_string_lossy().contains("native-launcher"));
         assert!(path.to_string_lossy().ends_with("config.toml"));
@@ -192,6 +198,7 @@ mod tests {
 
     #[test]
     fn apply_open_handler_config_registers_valid_entries() {
+        let _guard = open_handler_test_lock().lock().unwrap();
         configure_open_handlers(Vec::new());
 
         let mut config = Config::default();

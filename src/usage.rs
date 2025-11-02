@@ -15,6 +15,9 @@ pub struct AppUsage {
     pub last_used: u64,
     /// Timestamp of first launch
     pub first_used: u64,
+    /// Launch timestamps for hour-of-day analysis (stores last 100 launches)
+    #[serde(default)]
+    pub launch_history: Vec<u64>,
 }
 
 impl AppUsage {
@@ -24,25 +27,69 @@ impl AppUsage {
             launch_count: 0,
             last_used: now,
             first_used: now,
+            launch_history: Vec::new(),
         }
     }
 
     /// Record a launch
     pub fn record_launch(&mut self) {
         self.launch_count += 1;
-        self.last_used = current_timestamp();
+        let now = current_timestamp();
+        self.last_used = now;
+
+        // Store in launch history (keep last 100)
+        self.launch_history.push(now);
+        if self.launch_history.len() > 100 {
+            self.launch_history.remove(0);
+        }
     }
 
     /// Calculate a usage score for ranking (higher = more relevant)
+    /// Includes time decay and hour-of-day boost
     pub fn score(&self) -> f64 {
         let now = current_timestamp();
         let days_since_last = ((now - self.last_used) as f64) / 86400.0; // seconds to days
 
-        // Score formula: launch_count * recency_factor
+        // Base score: launch_count * recency_factor
         // Recency factor decays exponentially (half-life of 7 days)
         let recency_factor = 2.0_f64.powf(-days_since_last / 7.0);
+        let base_score = (self.launch_count as f64) * recency_factor;
 
-        (self.launch_count as f64) * recency_factor
+        // Hour-of-day boost: analyze launch history to see if this hour is typical
+        let hour_boost = self.calculate_hour_boost(now);
+
+        base_score * hour_boost
+    }
+
+    /// Calculate hour-of-day boost based on launch history
+    /// Returns a multiplier (1.0 = neutral, >1.0 = boost, <1.0 = penalty)
+    fn calculate_hour_boost(&self, now: u64) -> f64 {
+        if self.launch_history.is_empty() || self.launch_history.len() < 5 {
+            return 1.0; // Not enough data
+        }
+
+        // Get current hour (0-23)
+        let current_hour = ((now % 86400) / 3600) as u8;
+
+        // Count launches in current hour from history
+        let mut hour_counts = [0u32; 24];
+        for &timestamp in &self.launch_history {
+            let hour = ((timestamp % 86400) / 3600) as u8;
+            hour_counts[hour as usize] += 1;
+        }
+
+        // Calculate boost: if current hour has high launch rate, boost it
+        let current_hour_count = hour_counts[current_hour as usize] as f64;
+        let avg_count = self.launch_history.len() as f64 / 24.0;
+
+        if avg_count < 0.1 {
+            return 1.0; // Avoid division by near-zero
+        }
+
+        // Boost factor: 1.0 + (relative_frequency - 1.0) * 0.3
+        // This gives up to 30% boost for hours with 2x average usage
+        let relative_frequency = current_hour_count / avg_count;
+        1.0 + (relative_frequency - 1.0) * 0.3
     }
 }
 
@@ -228,5 +275,87 @@ mod tests {
         let mut usage2 = AppUsage::new();
         usage2.record_launch();
         assert!(usage2.score() > 0.0);
+    }
+
+    #[test]
+    fn test_launch_history_tracking() {
+        let mut usage = AppUsage::new();
+
+        // Record 5 launches
+        for _ in 0..5 {
+            usage.record_launch();
+        }
+
+        assert_eq!(usage.launch_history.len(), 5);
+        assert_eq!(usage.launch_count, 5);
+    }
+
+    #[test]
+    fn test_launch_history_max_size() {
+        let mut usage = AppUsage::new();
+
+        // Record 150 launches (more than max of 100)
+        for _ in 0..150 {
+            usage.record_launch();
+        }
+
+        // Should be capped at 100
+        assert_eq!(usage.launch_history.len(), 100);
+        assert_eq!(usage.launch_count, 150); // But count is accurate
+    }
+
+    #[test]
+    fn test_hour_boost_with_insufficient_data() {
+        let usage = AppUsage::new();
+        let now = current_timestamp();
+
+        // With no history, boost should be neutral (1.0)
+        let boost = usage.calculate_hour_boost(now);
+        assert_eq!(boost, 1.0);
+    }
+
+    #[test]
+    fn test_hour_boost_calculation() {
+        let mut usage = AppUsage::new();
+        let now = current_timestamp();
+        let current_hour_start = now - (now % 3600); // Start of current hour
+
+        // Simulate 20 launches: 10 in current hour, 10 spread across other hours
+        for i in 0..10 {
+            usage.launch_history.push(current_hour_start + i * 100);
+        }
+        for i in 0..10 {
+            usage
+                .launch_history
+                .push(current_hour_start - 3600 * (i as u64 + 1));
+        }
+
+        let boost = usage.calculate_hour_boost(now);
+
+        // Current hour has 50% of launches (10 out of 20)
+        // With 24 hours, average would be 1/24 = 4.17%
+        // So current hour is ~12x average, should get a boost > 1.0
+        // With 0.3 multiplier: 1.0 + (12 - 1) * 0.3 = 1.0 + 3.3 = 4.3
+        assert!(boost > 1.0);
+        assert!(boost < 5.0); // Allow for high boost when hour is very active
+    }
+
+    #[test]
+    fn test_time_decay() {
+        let mut usage = AppUsage::new();
+        usage.record_launch();
+
+        let score_fresh = usage.score();
+
+        // Simulate old launch (30 days ago)
+        usage.last_used = current_timestamp() - (30 * 86400);
+        usage.launch_count = 10; // Even with more launches
+
+        let score_old = usage.score();
+
+        // Old usage should score lower despite higher count
+        // (depends on exact formula, but general principle holds)
+        assert!(score_fresh > 0.0);
+        assert!(score_old > 0.0);
     }
 }

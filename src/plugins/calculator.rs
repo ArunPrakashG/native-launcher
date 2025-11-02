@@ -27,7 +27,12 @@ impl CalculatorPlugin {
     fn evaluate(&self, expr: &str) -> Result<f64> {
         // Simple evaluation using meval-rs or similar
         // For now, use a basic implementation
-        let expr = expr.trim();
+        let mut expr = expr.trim().to_string();
+
+        // Lightweight handling for sqrt(...) by recursively evaluating the inner expression
+        // and replacing occurrences with their computed values before final evaluation.
+        // This avoids pulling in heavy parser dependencies while covering common cases.
+        expr = Self::preprocess_sqrt(&expr, |inner| self.evaluate(inner))?;
 
         // Try parsing as number first
         if let Ok(num) = expr.parse::<f64>() {
@@ -35,7 +40,7 @@ impl CalculatorPlugin {
         }
 
         // Use evalexpr crate for safe expression evaluation
-        match evalexpr::eval(expr) {
+        match evalexpr::eval(&expr) {
             Ok(value) => {
                 if let evalexpr::Value::Float(f) = value {
                     Ok(f)
@@ -47,6 +52,51 @@ impl CalculatorPlugin {
             }
             Err(e) => Err(anyhow::anyhow!("Evaluation error: {}", e)),
         }
+    }
+
+    /// Preprocess sqrt(...) patterns by evaluating inner expressions and replacing them.
+    /// The callback `eval_inner` is used to compute the value of the inner expression.
+    fn preprocess_sqrt<F>(input: &str, mut eval_inner: F) -> Result<String>
+    where
+        F: FnMut(&str) -> Result<f64>,
+    {
+        let mut s = input.to_string();
+        loop {
+            if let Some(start) = s.find("sqrt(") {
+                // Find matching closing parenthesis
+                let mut depth = 0usize;
+                let mut end_opt = None;
+                for (i, ch) in s[start + 5..].char_indices() {
+                    let idx = start + 5 + i;
+                    if ch == '(' {
+                        depth += 1;
+                    } else if ch == ')' {
+                        if depth == 0 {
+                            end_opt = Some(idx);
+                            break;
+                        } else {
+                            depth -= 1;
+                        }
+                    }
+                }
+
+                let end = match end_opt {
+                    Some(e) => e,
+                    None => break, // Unbalanced, give up preprocessing
+                };
+
+                let inner = &s[start + 5..end]; // contents inside sqrt(...)
+                let value = eval_inner(inner)?;
+                if value < 0.0 {
+                    return Err(anyhow::anyhow!("sqrt of negative value"));
+                }
+                let replacement = format!("{}", value.sqrt());
+                s.replace_range(start..=end, &replacement);
+            } else {
+                break;
+            }
+        }
+        Ok(s)
     }
 }
 

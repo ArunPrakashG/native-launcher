@@ -35,7 +35,7 @@ fn typing_latency_benchmark(c: &mut Criterion) {
     let entry_arena = DesktopEntryArena::from_vec(entries);
     let usage_tracker = UsageTracker::new();
     let config = Config::default();
-    let plugin_manager = PluginManager::new(entry_arena, Some(usage_tracker), &config);
+    let plugin_manager = PluginManager::new(entry_arena, Some(usage_tracker), None, &config);
 
     let mut group = c.benchmark_group("typing_latency");
     group.sample_size(20); // Reduce samples since this is expensive
@@ -76,7 +76,7 @@ fn keystroke_latency_benchmark(c: &mut Criterion) {
     let entry_arena = DesktopEntryArena::from_vec(entries);
     let usage_tracker = UsageTracker::new();
     let config = Config::default();
-    let plugin_manager = PluginManager::new(entry_arena, Some(usage_tracker), &config);
+    let plugin_manager = PluginManager::new(entry_arena, Some(usage_tracker), None, &config);
 
     let mut group = c.benchmark_group("keystroke_latency");
 
@@ -107,7 +107,7 @@ fn file_index_benchmark(c: &mut Criterion) {
     let entry_arena = DesktopEntryArena::from_vec(entries);
     let usage_tracker = UsageTracker::new();
     let config = Config::default();
-    let plugin_manager = PluginManager::new(entry_arena, Some(usage_tracker), &config);
+    let plugin_manager = PluginManager::new(entry_arena, Some(usage_tracker), None, &config);
 
     let mut group = c.benchmark_group("file_index_search");
 
@@ -132,7 +132,7 @@ fn app_search_benchmark(c: &mut Criterion) {
     let entry_arena = DesktopEntryArena::from_vec(entries);
     let usage_tracker = UsageTracker::new();
     let config = Config::default();
-    let plugin_manager = PluginManager::new(entry_arena, Some(usage_tracker), &config);
+    let plugin_manager = PluginManager::new(entry_arena, Some(usage_tracker), None, &config);
 
     let mut group = c.benchmark_group("app_search");
 
@@ -165,8 +165,12 @@ fn cache_miss_benchmark(c: &mut Criterion) {
     c.bench_function("file_index_cache_miss", |b| {
         b.iter(|| {
             // Create fresh plugin manager each time to simulate cache miss
-            let plugin_manager =
-                PluginManager::new(entry_arena.clone(), Some(usage_tracker.clone()), &config);
+            let plugin_manager = PluginManager::new(
+                entry_arena.clone(),
+                Some(usage_tracker.clone()),
+                None,
+                &config,
+            );
 
             // Use different query each time to avoid cache hits
             let n = counter.fetch_add(1, Ordering::Relaxed);

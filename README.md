@@ -17,17 +17,62 @@
 
 ## ✨ Features
 
-- ⚡ **Lightning Fast** - <100ms startup, <10ms search
-- 🎨 **Beautiful Themes** - 6 built-in themes (Default, Nord, Dracula, Catppuccin, Gruvbox, Tokyo Night)
-- 🔍 **Smart Search** - Fuzzy matching with intelligent ranking
-- 🧮 **Advanced Calculator** - Time, units, currency, timezone conversions
-- 📁 **File Search** - System-wide indexing with plocate/fd/find
-- 🌐 **Web Search** - Instant web search with Ctrl+Enter
-- � **Quick Screenshots** - Capture screen, window, or area via `@screenshot` / `@ss`
-- �🔌 **Plugin System** - Extensible with dynamic plugins
-- ⌨️ **Keyboard-Driven** - Full keyboard navigation
+### 🚀 Core Features
+
+- ⚡ **Lightning Fast** - <35ms startup, <10ms search, optimized for responsive typing
+- ⭐ **Pins/Favorites** - Pin apps with Ctrl+P; pinned apps show ★ indicator
+- 🎨 **Theme System** - 6 themes + 7 accent colors (coral, teal, violet, blue, green, orange, pink)
+- 🔍 **Smart Search** - Enhanced fuzzy matching with acronym support and query highlighting
+- 🎯 **Usage Learning** - Hour-of-day boost and time-decay ranking (learns your patterns)
+- 🎨 **Density Modes** - Compact or comfortable UI spacing (configurable)
+- 🖼️ **Smart Icons** - Category-based fallback for 150+ app types (all apps get appropriate icons)
+
+### 🪟 Session & Window Management
+
+- 🔄 **Session Switcher** - `@switch` - Switch between windows and VS Code workspaces (Hyprland/Sway)
+- 🪟 **Window Management** - `@wm` - Move, center, fullscreen, float, pin windows (Hyprland/Sway)
+- 📂 **Recent Documents** - `@recent` - Access recently opened files with timestamps
+
+### 💻 Development Tools
+
+- 🔧 **Git Projects** - `@git` - Find and open git repositories in your editor
+- 💻 **VS Code Workspaces** - `@code` - Quick access to coding projects
+- 🐚 **SSH Manager** - `@ssh` - Connect to configured SSH hosts
+
+### 🔍 Search & Productivity
+
+- 🧮 **Advanced Calculator** - `@cal` - Math, units, currency, time, timezone conversions
+- 📁 **File Search** - `@files` - System-wide file indexing with plocate/fd/find
+- 🌐 **Web Search** - Instant web search with Ctrl+Enter (5+ search engines)
+- 🌐 **Browser History** - `@tabs` / `@history` - Search across 6 browsers (Chrome, Brave, Firefox, Edge, Vivaldi, Opera)
+- 📋 **Clipboard History** - `@clip` - Paste recent items (cliphist integration)
+- 😀 **Emoji Picker** - `@emoji` - Search and copy 3000+ emojis
+
+### 📸 Media & Screenshots
+
+- 📷 **Screenshots** - `@ss` - Capture screen/window/area
+- ✏️ **Screenshot Annotate** - `@ss annotate` - Edit screenshots with Swappy
+
+### ⌨️ Enhanced Keyboard Actions
+
+- `Alt+Enter` - Open containing folder (file results)
+- `Ctrl+Enter` - Copy path to clipboard (doesn't close window)
+- `Ctrl+P` - Pin/unpin selected app
+- `Ctrl+1` - Execute first result instantly
+
+### 🎨 Visual Polish
+
+- 🏷️ **Icon Badges** - Visual indicators (terminal🖥️, web🌐, file📄, folder📁)
+- ✨ **Match Highlighting** - Coral-colored query matches in results
+- 🎭 **Smooth Animations** - 60fps+ transitions with cubic-bezier easing
+
+### 🔧 Technical Excellence
+
+- 🔌 **Plugin System** - Extensible with dynamic plugins and script support
 - 🪟 **Wayland Native** - Built on gtk4-layer-shell
-- 🔄 **Auto-Updates** - Background update checking
+- 🔄 **Auto-Updates** - Background version checking
+- 📊 **150 Tests** - Comprehensive test coverage
+- 🎯 **Performance First** - Every feature optimized for speed
 
 ## 🚀 Quick Install
 
@@ -111,22 +156,31 @@ Choose from 6 beautiful themes during installation:
 2. Type to search applications
 3. Use **↑/↓** to navigate
 4. Press **Enter** to launch
-5. Press **Ctrl+Enter** for web search
-6. Press **Escape** to close
+5. Press **Ctrl+1** to execute first result (fast workflow - no navigation needed)
+6. Press **Ctrl+Enter** for web search
+7. Press **Ctrl+P** to Pin/Unpin selected app (appears first in default results)
+8. Press **Escape** to close
 
 ### Command Prefixes
 
-| Prefix                | Plugin             | Example                |
-| --------------------- | ------------------ | ---------------------- |
-| `@app`                | Applications       | `@app firefox`         |
-| `@cal`                | Calculator         | `@cal 2+2`             |
-| `@convert`            | Unit Conversion    | `@convert 10kg to lbs` |
-| `@time`               | Time/Timezone      | `@time Tokyo`          |
-| `@files`              | File Search        | `@files config`        |
-| `$ or @shell`         | Shell Commands     | `$ ls -la`             |
-| `@ssh`                | SSH Connections    | `@ssh server`          |
-| `@code`               | VS Code Workspaces | `@code my-project`     |
-| `@screenshot` / `@ss` | Screenshots        | `@ss window`           |
+| Prefix                | Plugin                 | Example                |
+| --------------------- | ---------------------- | ---------------------- |
+| `@app`                | Applications           | `@app firefox`         |
+| `@switch` / `@sw`     | Session Switcher       | `@switch code`         |
+| `@wm` / `@window`     | Window Management      | `@wm workspace 2`      |
+| `@git` / `@repo`      | Git Projects           | `@git my-project`      |
+| `@recent` / `@r`      | Recent Documents       | `@recent config`       |
+| `@tabs` / `@history`  | Browser History        | `@tabs github`         |
+| `@clip`               | Clipboard History      | `@clip password`       |
+| `@emoji`              | Emoji Picker           | `@emoji smile`         |
+| `@cal`                | Calculator             | `@cal 2+2`             |
+| `@convert`            | Unit Conversion        | `@convert 10kg to lbs` |
+| `@time`               | Time/Timezone          | `@time Tokyo`          |
+| `@files`              | File Search            | `@files config`        |
+| `$ or @shell`         | Shell Commands         | `$ ls -la`             |
+| `@ssh`                | SSH Connections        | `@ssh server`          |
+| `@code`               | VS Code Workspaces     | `@code my-project`     |
+| `@screenshot` / `@ss` | Screenshots & Annotate | `@ss annotate`         |
 
 ### Screenshots
 
@@ -149,6 +203,7 @@ man native-launcher
 - 🔌 [Plugin Development](https://github.com/ArunPrakashG/native-launcher/wiki/Plugin-Development)
 - 🎨 [UI Design](https://github.com/ArunPrakashG/native-launcher/wiki/UI-Design)
 - 🚀 [Performance](https://github.com/ArunPrakashG/native-launcher/wiki/Performance)
+- ⭐ [Pins & Favorites](https://github.com/ArunPrakashG/native-launcher/wiki/Keyboard-Shortcuts#navigation)
 
 ## 🛠️ Advanced
 

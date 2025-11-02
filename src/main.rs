@@ -1,6 +1,7 @@
 mod config;
 mod daemon;
 mod desktop;
+mod pins;
 mod plugins;
 mod search;
 mod ui;
@@ -8,6 +9,7 @@ mod updater;
 mod usage;
 mod utils;
 
+use crate::pins::PinsStore;
 use anyhow::Result;
 use config::ConfigLoader;
 use desktop::DesktopScanner;
@@ -17,11 +19,12 @@ use gtk4::{Application, Box as GtkBox, Orientation};
 use plugins::{KeyboardAction, KeyboardEvent, PluginManager};
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 use tracing_subscriber::EnvFilter;
 use ui::{load_theme_with_name, KeyboardHints, LauncherWindow, ResultsList, SearchWidget};
 use usage::UsageTracker;
-use utils::{build_open_command, detect_web_search, execute_command, get_default_browser};
+use utils::{build_open_command, execute_command};
 
 const APP_ID: &str = "com.github.native-launcher";
 
@@ -100,12 +103,10 @@ fn run_normal_mode() -> Result<()> {
 
     let entry_arena = desktop::DesktopEntryArena::from_vec(raw_entries);
 
-    // Start background icon cache preloading
-    info!("Starting icon cache preloading in background...");
-    let entries_for_cache = entry_arena.clone();
-    std::thread::spawn(move || {
-        utils::icons::preload_icon_cache(&entries_for_cache);
-    });
+    // OPTIMIZATION: Icon cache uses lazy loading on-demand (no preloading)
+    // Icons are cached as they're requested during search results rendering
+    // This reduces startup time (~10-20ms) and memory usage for rarely-used apps
+    // The icon cache itself uses LRU eviction to stay within memory limits
 
     // Create plugin manager with all plugins
     info!("Initializing plugin system...");
@@ -115,14 +116,62 @@ fn run_normal_mode() -> Result<()> {
         None
     };
 
-    let mut plugin_manager =
-        PluginManager::new(entry_arena.clone(), usage_tracker_for_plugins, &config);
+    // Load pins store once and share
+    let pins_store = if config.search.enable_pins {
+        info!("Loading pins store...");
+        PinsStore::load().unwrap_or_else(|e| {
+            warn!("Failed to load pins: {} - starting empty", e);
+            PinsStore::new()
+        })
+    } else {
+        PinsStore::new()
+    };
+    let pins_store = Arc::new(pins_store);
+
+    let mut plugin_manager = PluginManager::new(
+        entry_arena.clone(),
+        usage_tracker_for_plugins,
+        if config.search.enable_pins {
+            Some(pins_store.clone())
+        } else {
+            None
+        },
+        &config,
+    );
 
     // Load dynamic plugins
     info!("Loading dynamic plugins...");
     let (dynamic_plugins, plugin_metrics) = plugins::load_plugins();
     for plugin in dynamic_plugins {
         plugin_manager.register_plugin(plugin);
+    }
+
+    // Populate browser index if enabled and stale (normal mode - dev only)
+    // In production, users should run in daemon mode for background indexing
+    if cfg!(debug_assertions) && config.plugins.browser_history {
+        let browser_plugin = plugins::BrowserHistoryPlugin::new();
+        if let Some(index) = browser_plugin.get_index() {
+            if index.needs_rebuild() {
+                info!("Browser index needs refresh, populating in background (dev mode)...");
+                let browser_arc = std::sync::Arc::new(browser_plugin.clone());
+                std::thread::spawn(move || {
+                    info!("Fetching browser history for index...");
+                    let entries = browser_arc.fetch_all_history();
+                    info!("Indexing {} browser entries...", entries.len());
+                    if let Err(e) = index.rebuild_index(entries) {
+                        error!("Failed to build browser index: {}", e);
+                    } else {
+                        if let Ok(count) = index.entry_count() {
+                            info!("Browser index built with {} entries", count);
+                        }
+                    }
+                });
+            } else {
+                if let Ok(count) = index.entry_count() {
+                    info!("Browser index already up-to-date with {} entries", count);
+                }
+            }
+        }
     }
 
     let plugin_manager = Rc::new(RefCell::new(plugin_manager));
@@ -154,6 +203,7 @@ fn run_normal_mode() -> Result<()> {
             usage_enabled,
             &config_clone,
             metrics_clone.clone(),
+            Some(pins_store.clone()), // Ensure new pins_store parameter is passed
         ) {
             error!("Failed to build UI: {}", e);
             app.quit();
@@ -174,6 +224,7 @@ fn build_ui(
     usage_enabled: bool,
     config: &config::Config,
     plugin_metrics: Rc<Vec<plugins::PluginMetrics>>,
+    pins_store: Option<Arc<PinsStore>>,
 ) -> Result<()> {
     info!("Building UI");
 
@@ -202,9 +253,11 @@ fn build_ui(
 
     // Create results list
     let results_list = ResultsList::new();
+    if let Some(pins) = &pins_store {
+        results_list.set_pins_store(pins.clone());
+    }
 
-    // Create search footer
-    let search_footer = ui::SearchFooter::new();
+    // Search footer removed (no longer used)
 
     // Create keyboard hints
     let keyboard_hints = KeyboardHints::new();
@@ -267,6 +320,19 @@ fn build_ui(
     main_box.set_vexpand(false);
     main_box.set_hexpand(false);
 
+    // Apply density class from config
+    let density_class = match config.ui.density.as_str() {
+        "compact" => "density-compact",
+        _ => "density-comfortable", // Default to comfortable
+    };
+    main_box.add_css_class(density_class);
+    info!("Applied density mode: {}", config.ui.density);
+
+    // Apply accent color class from config
+    let accent_class = format!("accent-{}", config.ui.accent);
+    main_box.add_css_class(&accent_class);
+    info!("Applied accent color: {}", config.ui.accent);
+
     // Add plugin warning at the top if there are slow plugins
     if let Some(warning) = plugin_warning {
         main_box.append(&warning);
@@ -274,7 +340,7 @@ fn build_ui(
 
     main_box.append(&search_widget.container);
     main_box.append(&results_list.container);
-    main_box.append(&search_footer.container);
+    // Footer removed from layout per design
     main_box.append(&keyboard_hints.container);
 
     launcher_window.window.set_child(Some(&main_box));
@@ -295,7 +361,7 @@ fn build_ui(
     // Handle search text changes with debouncing to prevent lag
     {
         let results_list = results_list.clone();
-        let search_footer_clone = search_footer.clone();
+        // Footer removed; no footer updates
         let plugin_manager = plugin_manager.clone();
         let max_results = config.search.max_results;
 
@@ -306,15 +372,7 @@ fn build_ui(
         search_widget.entry.connect_changed(move |entry| {
             let query = entry.text().to_string();
 
-            // IMMEDIATE: Update web search footer (no delay)
-            // This gives instant visual feedback even with debouncing
-            if let Some((engine, search_term, _url)) = detect_web_search(&query) {
-                let browser = get_default_browser();
-                search_footer_clone.update(&engine, &search_term, &browser);
-                search_footer_clone.show();
-            } else {
-                search_footer_clone.hide();
-            }
+            // Footer removed: no per-keystroke footer hints
 
             // Increment counter to cancel any pending searches
             // Previous timeout will check counter and skip search if stale
@@ -328,13 +386,13 @@ fn build_ui(
             let plugin_manager_clone = plugin_manager.clone();
             let plugin_manager_for_metrics = plugin_manager.clone();
             let results_list_clone = results_list.clone();
-            let search_footer_for_loading = search_footer_clone.clone();
+            // Footer removed: no loading indicator
             let debounce_counter_clone = debounce_counter.clone();
             let query_clone = query.clone();
 
-            // DEBOUNCED: Wait 150ms after last keystroke before searching
-            // This prevents lag when typing quickly (e.g., "config" triggers 1 search, not 6)
-            gtk4::glib::timeout_add_local_once(std::time::Duration::from_millis(150), move || {
+            // DEBOUNCED: Wait 30ms after last keystroke before searching (optimized for fast typing)
+            // Shorter delay provides better responsiveness without excessive searches
+            gtk4::glib::timeout_add_local_once(std::time::Duration::from_millis(30), move || {
                 // Check if this timeout is still valid (not superseded by newer typing)
                 if *debounce_counter_clone.borrow() != current_count {
                     debug!("Skipping stale search (user still typing)");
@@ -345,9 +403,9 @@ fn build_ui(
                 let manager = plugin_manager_clone.borrow();
                 let results_list_for_fast = results_list_clone.clone();
                 let results_list_for_slow = results_list_clone.clone();
-                let footer_for_fast = search_footer_for_loading.clone();
-                let footer_for_slow = search_footer_for_loading.clone();
-                let query_for_check = query_clone.clone();
+
+                // Keep current query for highlighting
+                results_list_clone.set_query(&query_clone);
 
                 let result = manager.search_incremental(
                     &query_clone,
@@ -356,11 +414,6 @@ fn build_ui(
                     move |fast_results| {
                         debug!("Displaying {} fast results", fast_results.len());
                         results_list_for_fast.update_plugin_results(fast_results);
-
-                        // Show loading indicator if query might trigger file search
-                        if !query_for_check.starts_with('@') && query_for_check.len() >= 3 {
-                            footer_for_fast.show_loading();
-                        }
                     },
                     // Slow results callback - files, SSH (may take longer)
                     move |slow_results| {
@@ -368,7 +421,6 @@ fn build_ui(
                         if !slow_results.is_empty() {
                             results_list_for_slow.append_plugin_results(slow_results);
                         }
-                        footer_for_slow.hide_loading();
 
                         // Log performance metrics (every 10th search)
                         let manager_ref = plugin_manager_for_metrics.borrow();
@@ -408,6 +460,21 @@ fn build_ui(
                 .and_then(|s| s.keyboard())
                 .map(|k| k.modifier_state())
                 .unwrap_or(gtk4::gdk::ModifierType::empty());
+
+            // Shift+Enter on clipboard results: copy without closing window
+            if modifiers.contains(gtk4::gdk::ModifierType::SHIFT_MASK) {
+                if let Some(plugin_name) = results_list.get_selected_plugin_name() {
+                    if plugin_name == "clipboard" {
+                        if let Some((command, terminal)) = results_list.get_selected_command() {
+                            if let Err(e) = execute_command(&command, terminal, merge_login_env) {
+                                error!("Failed to execute copy command: {}", e);
+                            }
+                            // Do not close window; stop further handling
+                            return;
+                        }
+                    }
+                }
+            }
 
             // Create keyboard event and dispatch to plugins
             let query = search_entry_clone.text().to_string();
@@ -469,6 +536,56 @@ fn build_ui(
                     // Plugin handled it but don't close window
                     debug!("Keyboard event handled by plugin");
                 }
+                KeyboardAction::OpenFolder(path) => {
+                    info!("Opening folder: {}", path);
+                    let folder = if std::path::Path::new(&path).is_dir() {
+                        path
+                    } else {
+                        std::path::Path::new(&path)
+                            .parent()
+                            .map(|p| p.to_string_lossy().to_string())
+                            .unwrap_or_else(|| ".".to_string())
+                    };
+
+                    window_clone.close();
+
+                    let open_command = build_open_command(&folder);
+                    if let Err(e) = execute_command(&open_command, false, merge_login_env) {
+                        error!("Failed to open folder: {}", e);
+                    }
+                }
+                KeyboardAction::CopyPath(path) => {
+                    info!("Copying path to clipboard: {}", path);
+                    let copy_cmd = if std::process::Command::new("which")
+                        .arg("wl-copy")
+                        .output()
+                        .map(|o| o.status.success())
+                        .unwrap_or(false)
+                    {
+                        format!("echo -n '{}' | wl-copy", path.replace('\'', r"'\''"))
+                    } else if std::process::Command::new("which")
+                        .arg("xclip")
+                        .output()
+                        .map(|o| o.status.success())
+                        .unwrap_or(false)
+                    {
+                        format!(
+                            "echo -n '{}' | xclip -selection clipboard",
+                            path.replace('\'', r"'\''")
+                        )
+                    } else {
+                        error!("No clipboard tool found (need wl-copy or xclip)");
+                        return;
+                    };
+
+                    if let Err(e) = std::process::Command::new("sh")
+                        .arg("-c")
+                        .arg(&copy_cmd)
+                        .spawn()
+                    {
+                        error!("Failed to copy path: {}", e);
+                    }
+                }
             }
         });
     }
@@ -496,6 +613,7 @@ fn build_ui(
         let window_clone = launcher_window.window.clone();
         let usage_tracker_clone = usage_tracker.clone();
         let search_entry_clone = search_widget.entry.clone();
+        // Footer removed
         let plugin_manager_clone = plugin_manager.clone();
 
         let key_controller = gtk4::EventControllerKey::new();
@@ -535,6 +653,24 @@ fn build_ui(
                     gtk4::glib::Propagation::Stop
                 }
                 Key::Return => {
+                    // Shift+Enter on clipboard results: copy without closing window
+                    if modifiers.contains(gtk4::gdk::ModifierType::SHIFT_MASK) {
+                        if let Some(plugin_name) = results_list_clone.get_selected_plugin_name() {
+                            if plugin_name == "clipboard" {
+                                if let Some((command, terminal)) =
+                                    results_list_clone.get_selected_command()
+                                {
+                                    if let Err(e) =
+                                        execute_command(&command, terminal, merge_login_env)
+                                    {
+                                        error!("Failed to execute copy command: {}", e);
+                                    }
+                                    // Keep window open
+                                    return gtk4::glib::Propagation::Stop;
+                                }
+                            }
+                        }
+                    }
                     // Create keyboard event and dispatch to plugins
                     let query = search_entry_clone.text().to_string();
                     let has_selection = results_list_clone.get_selected_command().is_some();
@@ -558,7 +694,6 @@ fn build_ui(
                         }
                         KeyboardAction::OpenUrl(url) => {
                             info!("Opening URL from plugin: {}", url);
-
                             // IMPORTANT: Hide window BEFORE opening URL
                             window_clone.close();
 
@@ -582,11 +717,105 @@ fn build_ui(
                             // Plugin handled it but don't close window
                             debug!("Keyboard event handled by plugin");
                         }
+                        KeyboardAction::OpenFolder(path) => {
+                            info!("Opening folder: {}", path);
+                            // Open containing folder (extract parent directory from path)
+                            let folder = if std::path::Path::new(&path).is_dir() {
+                                path
+                            } else {
+                                std::path::Path::new(&path)
+                                    .parent()
+                                    .map(|p| p.to_string_lossy().to_string())
+                                    .unwrap_or_else(|| ".".to_string())
+                            };
+
+                            window_clone.close();
+
+                            let open_command = build_open_command(&folder);
+                            if let Err(e) = execute_command(&open_command, false, merge_login_env) {
+                                error!("Failed to open folder: {}", e);
+                            }
+                        }
+                        KeyboardAction::CopyPath(path) => {
+                            info!("Copying path to clipboard: {}", path);
+                            // Copy to clipboard using wl-copy or xclip
+                            let copy_cmd = if std::process::Command::new("which")
+                                .arg("wl-copy")
+                                .output()
+                                .map(|o| o.status.success())
+                                .unwrap_or(false)
+                            {
+                                format!("echo -n '{}' | wl-copy", path.replace('\'', r"'\''"))
+                            } else if std::process::Command::new("which")
+                                .arg("xclip")
+                                .output()
+                                .map(|o| o.status.success())
+                                .unwrap_or(false)
+                            {
+                                format!(
+                                    "echo -n '{}' | xclip -selection clipboard",
+                                    path.replace('\'', r"'\''")
+                                )
+                            } else {
+                                error!("No clipboard tool found (need wl-copy or xclip)");
+                                return gtk4::glib::Propagation::Stop;
+                            };
+
+                            if let Err(e) = std::process::Command::new("sh")
+                                .arg("-c")
+                                .arg(&copy_cmd)
+                                .spawn()
+                            {
+                                error!("Failed to copy path: {}", e);
+                            }
+
+                            // Don't close window - user might want to copy multiple paths
+                        }
                     }
 
                     gtk4::glib::Propagation::Stop
                 }
-                _ => gtk4::glib::Propagation::Proceed,
+                _ => {
+                    // Ctrl+P: Toggle pin on selected app (if supported)
+                    if modifiers.contains(gtk4::gdk::ModifierType::CONTROL_MASK) {
+                        let maybe_char = key.to_unicode();
+                        if maybe_char == Some('p') || maybe_char == Some('P') {
+                            if let Some(path) = results_list_clone.get_selected_path() {
+                                if let Some(pins) = &pins_store {
+                                    match pins.toggle(&path) {
+                                        Ok(_pinned) => {
+                                            // Refresh only visuals (stars)
+                                            results_list_clone.rerender();
+                                        }
+                                        Err(e) => warn!("Failed to toggle pin: {}", e),
+                                    }
+                                }
+                            }
+                            return gtk4::glib::Propagation::Stop;
+                        }
+                        // Ctrl+1: Execute first result (fast keyboard workflow)
+                        else if maybe_char == Some('1') {
+                            info!("Ctrl+1: Executing first result");
+
+                            // Select first result if none selected
+                            if results_list_clone.get_selected_command().is_none() {
+                                results_list_clone.select_first();
+                            }
+
+                            // Execute the (now) selected result
+                            handle_selected_result(
+                                &results_list_clone,
+                                &window_clone,
+                                &usage_tracker_clone,
+                                usage_enabled,
+                                merge_login_env,
+                            );
+
+                            return gtk4::glib::Propagation::Stop;
+                        }
+                    }
+                    gtk4::glib::Propagation::Proceed
+                }
             }
         });
 
@@ -619,6 +848,8 @@ fn build_ui(
     info!("UI built successfully");
     Ok(())
 }
+
+// Footer hints removed – bottom bar now handles all shortcut hints
 
 fn handle_selected_result(
     results_list: &ResultsList,
@@ -710,12 +941,10 @@ fn run_daemon_mode() -> Result<()> {
 
     let entry_arena = desktop::DesktopEntryArena::from_vec(raw_entries);
 
-    // Start background icon cache preloading
-    info!("Starting icon cache preloading in background...");
-    let entries_for_cache = entry_arena.clone();
-    std::thread::spawn(move || {
-        utils::icons::preload_icon_cache(&entries_for_cache);
-    });
+    // OPTIMIZATION: Icon cache uses lazy loading on-demand (no preloading)
+    // Icons are cached as they're requested during search results rendering
+    // This reduces startup time (~10-20ms) and memory usage for rarely-used apps
+    // The icon cache itself uses LRU eviction to stay within memory limits
 
     // Create plugin manager with all plugins
     info!("Initializing plugin system...");
@@ -724,8 +953,36 @@ fn run_daemon_mode() -> Result<()> {
     } else {
         None
     };
-    let mut plugin_manager =
-        PluginManager::new(entry_arena.clone(), usage_tracker_for_plugins, &config);
+
+    // Load pins store once and share (daemon mode)
+    // Pins store for daemon mode
+    let pins_store = Arc::new(if config.search.enable_pins {
+        info!("Loading pins store (daemon mode)...");
+        PinsStore::load().unwrap_or_else(|e| {
+            warn!("Failed to load pins: {} - starting empty", e);
+            PinsStore::new()
+        })
+    } else {
+        PinsStore::new()
+    });
+
+    // Create browser history plugin separately so we can start indexer
+    let browser_plugin = if config.plugins.browser_history {
+        Some(Arc::new(plugins::BrowserHistoryPlugin::new()))
+    } else {
+        None
+    };
+
+    let mut plugin_manager = PluginManager::new(
+        entry_arena.clone(),
+        usage_tracker_for_plugins,
+        if config.search.enable_pins {
+            Some(pins_store.clone())
+        } else {
+            None
+        },
+        &config,
+    );
 
     // Load dynamic plugins
     info!("Loading dynamic plugins...");
@@ -749,6 +1006,12 @@ fn run_daemon_mode() -> Result<()> {
     // Start Unix socket listener
     info!("Starting daemon socket listener...");
     let socket_receiver = daemon::start_socket_listener()?;
+
+    // Start browser history indexer in background
+    if let Some(ref browser) = browser_plugin {
+        info!("Starting browser history indexer...");
+        daemon::start_browser_indexer(browser.clone());
+    }
 
     // Register cleanup handler
     let cleanup_guard = scopeguard::guard((), |_| {
@@ -819,6 +1082,7 @@ fn run_daemon_mode() -> Result<()> {
             usage_enabled,
             &config_clone,
             metrics_clone.clone(),
+            Some(pins_store.clone()),
         ) {
             Ok(()) => {
                 // Store window reference

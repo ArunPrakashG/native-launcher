@@ -51,8 +51,12 @@ fn bench_full_startup(c: &mut Criterion) {
             let entry_arena = DesktopEntryArena::from_vec(entries);
 
             // Plugin manager creation
-            let plugin_manager =
-                PluginManager::new(entry_arena.clone(), Some(usage_tracker.clone()), &config);
+            let plugin_manager = PluginManager::new(
+                entry_arena.clone(),
+                Some(usage_tracker.clone()),
+                None,
+                &config,
+            );
 
             // Load dynamic plugins
             let (dynamic_plugins, _metrics) = native_launcher::plugins::load_plugins();
@@ -84,8 +88,12 @@ fn bench_plugin_initialization(c: &mut Criterion) {
 
     group.bench_function("plugin_manager_creation", |b| {
         b.iter(|| {
-            let plugin_manager =
-                PluginManager::new(entry_arena.clone(), Some(usage_tracker.clone()), &config);
+            let plugin_manager = PluginManager::new(
+                entry_arena.clone(),
+                Some(usage_tracker.clone()),
+                None,
+                &config,
+            );
             black_box(plugin_manager);
         });
     });

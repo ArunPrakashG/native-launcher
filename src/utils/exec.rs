@@ -31,6 +31,19 @@ fn handler_registry() -> &'static RwLock<HandlerRegistry> {
     OPEN_HANDLER_REGISTRY.get_or_init(|| RwLock::new(HandlerRegistry::default()))
 }
 
+// Global test-only mutex to serialize tests that manipulate the open handler registry.
+// This prevents cross-test interference when tests are executed in parallel.
+#[cfg(test)]
+use std::sync::Mutex;
+
+#[cfg(test)]
+static OPEN_HANDLER_TEST_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
+#[cfg(test)]
+pub fn open_handler_test_lock() -> &'static Mutex<()> {
+    OPEN_HANDLER_TEST_LOCK.get_or_init(|| Mutex::new(()))
+}
+
 #[derive(Debug, Clone)]
 pub struct CommandOpenHandler {
     pub command: String,
@@ -92,6 +105,14 @@ pub fn configure_open_handlers(handlers: Vec<CommandOpenHandler>) {
             callback: wrap_command_handler(handler),
         })
         .collect();
+}
+
+/// Check if a plugin-level open handler with the given name is already registered
+pub fn has_plugin_open_handler(name: &str) -> bool {
+    let registry = handler_registry()
+        .read()
+        .expect("open handler registry poisoned");
+    registry.plugin_handlers.iter().any(|e| e.name == name)
 }
 
 fn wrap_command_handler(handler: CommandOpenHandler) -> Arc<HandlerCallback> {
@@ -486,7 +507,7 @@ mod tests {
     use std::fs;
     use std::path::PathBuf;
     use std::sync::atomic::{AtomicBool, Ordering};
-    use std::sync::{Arc, Mutex, OnceLock};
+    use std::sync::Arc;
     use std::thread;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -498,14 +519,9 @@ mod tests {
         std::env::temp_dir().join(format!("native-launcher-{}-{}", prefix, ts))
     }
 
-    fn registry_mutex() -> &'static Mutex<()> {
-        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        LOCK.get_or_init(|| Mutex::new(()))
-    }
-
     #[test]
     fn plugin_handler_short_circuits_open_uri() -> Result<()> {
-        let _guard = registry_mutex().lock().unwrap();
+        let _guard = open_handler_test_lock().lock().unwrap();
         reset_open_handlers_for_test();
 
         let handled = Arc::new(AtomicBool::new(false));
@@ -535,7 +551,7 @@ mod tests {
 
     #[test]
     fn config_handler_runs_when_plugins_skip() -> Result<()> {
-        let _guard = registry_mutex().lock().unwrap();
+        let _guard = open_handler_test_lock().lock().unwrap();
         reset_open_handlers_for_test();
 
         register_open_handler("skipper", OpenHandlerPriority::First, |_target, _| {
@@ -573,7 +589,7 @@ mod tests {
 
     #[test]
     fn command_handler_injects_target_placeholder() -> Result<()> {
-        let _guard = registry_mutex().lock().unwrap();
+        let _guard = open_handler_test_lock().lock().unwrap();
         let path = unique_temp_path("placeholder");
         let mut handler = CommandOpenHandler::new("sh");
         handler.args = vec![

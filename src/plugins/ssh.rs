@@ -301,6 +301,8 @@ impl Plugin for SshPlugin {
                 plugin_name: self.name().to_string(),
                 sub_results: Vec::new(),
                 parent_app: None,
+                desktop_path: None,
+                badge_icon: Some("utilities-terminal-symbolic".to_string()), // Terminal badge for SSH
             };
 
             results.push(result);

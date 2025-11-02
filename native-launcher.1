@@ -99,8 +99,14 @@ Navigate results
 .B Enter
 Execute selected item
 .TP
+.B Ctrl+1
+Execute first result without navigation (fast workflow)
+.TP
 .B Ctrl+Enter
-Execute action without closing launcher
+Execute action without closing launcher / Web search
+.TP
+.B Ctrl+P
+Pin/unpin selected application
 .TP
 .B Tab
 Cycle through desktop actions (if available)
@@ -260,32 +266,61 @@ RUST_LOG=debug native-launcher
 "firefox" - Launch Firefox
 .br
 "firefox private" - Open private window (desktop action)
+.br
+"@app firefox" - Search applications explicitly
+.TP
+.B Browser history
+"github" - Search browser history (6 browsers)
+.br
+"@tabs react" - Search open/recent tabs
+.br
+"@history docs" - Search full history with bookmarks
+.TP
+.B Clipboard history
+"@clip" - List clipboard history items
+.br
+"@clip password" - Search clipboard for text
+.TP
+.B Emoji picker
+"@emoji smile" - Search and copy emojis
+.br
+"@emoji heart" - Find heart emojis
 .TP
 .B Calculator
 "2+2*3" - Math expression
 .br
+"@cal sqrt(16)" - Explicit calculator
+.br
 "100 USD to EUR" - Currency conversion
 .br
-"5 miles to km" - Unit conversion
+"@convert 5 miles to km" - Unit conversion
 .br
-"now in Tokyo" - Timezone conversion
+"@time now in Tokyo" - Timezone conversion
 .TP
 .B File search
 "report.pdf" - Find files matching name
 .br
-"*.rs" - Find all Rust files
+"@files *.rs" - Find all Rust files
 .TP
 .B Web search
-"!g wayland" - Google search
+"rust wayland" then Ctrl+Enter - Google search
 .br
-"!w Rust" - Wikipedia search
-.br
-"!gh native-launcher" - GitHub search
+"@web linux kernel" - Explicit web search
 .TP
 .B SSH
-"ssh prod" - Connect to production server
+"@ssh prod" - Connect to production server
 .br
-"ssh dev" - Connect to development server
+"@ssh dev" - Connect to development server
+.TP
+.B Shell commands
+"$ ls -la" - Execute shell command
+.br
+"@shell pwd" - Alternative shell syntax
+.TP
+.B Screenshots
+"@screenshot" - List capture options
+.br
+"@ss window" - Capture window screenshot
 
 .SH TROUBLESHOOTING
 .TP

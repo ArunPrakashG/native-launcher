@@ -63,6 +63,10 @@ pub enum KeyboardAction {
     OpenUrl(String),
     /// Event was handled but don't close window
     Handled,
+    /// Open containing folder (for files)
+    OpenFolder(String),
+    /// Copy path to clipboard
+    CopyPath(String),
 }
 
 /// Represents a result from a plugin search
@@ -88,6 +92,11 @@ pub struct PluginResult {
     /// Parent app name (for linked entries like workspaces, recent files)
     /// When set, the UI will use this app's icon for the entry
     pub parent_app: Option<String>,
+    /// Desktop file path if this result corresponds to an application entry
+    pub desktop_path: Option<String>,
+    /// Optional badge icon name (e.g., "terminal-symbolic", "folder-symbolic", "web-browser-symbolic")
+    /// Uses GTK symbolic icon names for small overlay indicators
+    pub badge_icon: Option<String>,
 }
 
 impl PluginResult {
@@ -104,6 +113,8 @@ impl PluginResult {
             #[allow(dead_code)]
             sub_results: Vec::new(),
             parent_app: None,
+            desktop_path: None,
+            badge_icon: None,
         }
     }
 
@@ -153,6 +164,21 @@ impl PluginResult {
 
     pub fn with_parent_app(mut self, parent_app: String) -> Self {
         self.parent_app = Some(parent_app);
+        self
+    }
+
+    /// Set desktop path for application results
+    #[allow(dead_code)]
+    pub fn with_desktop_path(mut self, path: String) -> Self {
+        self.desktop_path = Some(path);
+        self
+    }
+
+    /// Set badge icon (symbolic icon name for small indicator)
+    /// Common badges: "terminal-symbolic", "folder-symbolic", "web-browser-symbolic",
+    /// "document-symbolic", "video-symbolic", "audio-symbolic"
+    pub fn with_badge_icon(mut self, badge: String) -> Self {
+        self.badge_icon = Some(badge);
         self
     }
 }

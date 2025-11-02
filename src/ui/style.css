@@ -2,7 +2,7 @@
 
 /* === Color Palette === */
 :root {
-  /* Primary Colors - Coral Accent */
+  /* Primary Colors - Coral Accent (Default) */
   --nl-primary: #ff6363;
   --nl-primary-hover: #ff7a7a;
   --nl-primary-active: #ff4d4d;
@@ -498,45 +498,6 @@ listbox row:selected image {
   transform: scale(1.05) rotate(2deg);
 }
 
-/* === Search Footer === */
-.search-footer {
-  background-color: var(--nl-bg-secondary);
-  border-top: 1px solid var(--nl-border);
-  padding: 12px 24px;
-  margin: 0 16px 16px 16px;
-  border-radius: var(--nl-radius-large);
-  min-height: 44px;
-  opacity: 1;
-  transition: opacity var(--nl-animation-normal) var(--nl-easing);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.search-footer-text {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--nl-text-secondary);
-  letter-spacing: 0.2px;
-}
-
-.search-footer-accent {
-  color: var(--nl-primary);
-  font-weight: 600;
-}
-
-.search-footer-loading {
-  color: var(--nl-primary);
-  font-weight: 600;
-}
-
-.search-footer-query {
-  color: var(--nl-text-secondary);
-  font-style: italic;
-}
-
-.search-footer-browser {
-  color: var(--nl-text-secondary);
-}
-
 /* === Plugin Warning === */
 .plugin-warning {
   background-color: rgba(255, 159, 10, 0.15);
@@ -561,4 +522,123 @@ listbox row:selected image {
 
 .plugin-warning image {
   color: #ff9f0a;
+}
+
+/* === Pinned Star Indicator === */
+.pinned-star {
+  color: var(--nl-primary);
+  font-size: 14px;
+  opacity: 0.9;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.4);
+}
+
+listbox row:selected .pinned-star {
+  color: #fff;
+  text-shadow: 0 0 6px rgba(255, 99, 99, 0.35);
+}
+
+/* === Result Badge Icons === */
+.result-badge {
+  color: var(--nl-text-tertiary);
+  opacity: 0.6;
+  min-width: 16px;
+  min-height: 16px;
+  transition: all var(--nl-animation-fast) var(--nl-easing);
+}
+
+listbox row:selected .result-badge {
+  color: var(--nl-primary);
+  opacity: 0.9;
+}
+
+listbox row:hover .result-badge {
+  opacity: 0.8;
+}
+
+/* === Emoji Icons === */
+.emoji-icon {
+  font-size: 28px;
+}
+
+.emoji-icon-small {
+  font-size: 22px;
+}
+
+/* === Density Modes === */
+/* Compact density - tighter spacing */
+.density-compact listbox row {
+  padding: 10px 16px; /* Reduced from 14px */
+  margin: 2px 8px; /* Reduced from 3px */
+}
+
+.density-compact .app-name {
+  font-size: 14px; /* Slightly smaller */
+}
+
+.density-compact .app-generic {
+  font-size: 11px; /* Slightly smaller */
+}
+
+/* Comfortable density - default, more spacious */
+.density-comfortable listbox row {
+  padding: 14px 16px; /* Default */
+  margin: 3px 8px; /* Default */
+}
+
+.density-comfortable .app-name {
+  font-size: 15px; /* Default */
+}
+
+.density-comfortable .app-generic {
+  font-size: 12px; /* Default */
+}
+
+/* === Accent Color Variants === */
+/* Coral accent (default) - warm red/pink */
+.accent-coral {
+  --nl-primary: #ff6363;
+  --nl-primary-hover: #ff7a7a;
+  --nl-primary-active: #ff4d4d;
+}
+
+/* Teal accent - cool blue-green */
+.accent-teal {
+  --nl-primary: #5eead4;
+  --nl-primary-hover: #6ff5e3;
+  --nl-primary-active: #4dd4bd;
+}
+
+/* Violet accent - purple */
+.accent-violet {
+  --nl-primary: #a78bfa;
+  --nl-primary-hover: #b89ffe;
+  --nl-primary-active: #9370f5;
+}
+
+/* Blue accent - cool blue */
+.accent-blue {
+  --nl-primary: #60a5fa;
+  --nl-primary-hover: #7bb5fb;
+  --nl-primary-active: #4c94f3;
+}
+
+/* Green accent - natural green */
+.accent-green {
+  --nl-primary: #4ade80;
+  --nl-primary-hover: #5eea90;
+  --nl-primary-active: #38d170;
+}
+
+/* Orange accent - warm orange */
+.accent-orange {
+  --nl-primary: #fb923c;
+  --nl-primary-hover: #fca354;
+  --nl-primary-active: #f58026;
+}
+
+/* Pink accent - vibrant pink */
+.accent-pink {
+  --nl-primary: #f472b6;
+  --nl-primary-hover: #f584c2;
+  --nl-primary-active: #f060aa;
 }

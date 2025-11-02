@@ -261,6 +261,199 @@ pub fn get_greyed_icon(icon_name: &str) -> Option<PathBuf> {
     resolve_icon(icon_name)
 }
 
+/// Map freedesktop.org categories to appropriate fallback icon names
+///
+/// This provides intelligent icon fallbacks for applications without
+/// explicit Icon= fields by using their Categories field.
+/// Based on freedesktop.org menu specification:
+/// https://specifications.freedesktop.org/menu-spec/latest/apa.html
+pub fn category_to_icon(categories: &[String]) -> Option<&'static str> {
+    // Priority order: more specific categories first
+    for category in categories {
+        let icon = match category.as_str() {
+            // Main Categories
+            "AudioVideo" => "applications-multimedia",
+            "Audio" => "audio-x-generic",
+            "Video" => "video-x-generic",
+            "Development" => "applications-development",
+            "Education" => "applications-education",
+            "Game" => "applications-games",
+            "Graphics" => "applications-graphics",
+            "Network" => "applications-internet",
+            "Office" => "applications-office",
+            "Science" => "applications-science",
+            "Settings" => "preferences-system",
+            "System" => "applications-system",
+            "Utility" => "applications-utilities",
+
+            // Additional Categories (more specific)
+            "Building" => "applications-development",
+            "Debugger" => "applications-development",
+            "IDE" => "applications-development",
+            "GUIDesigner" => "applications-development",
+            "Profiling" => "system-monitoring",
+            "RevisionControl" => "applications-development",
+            "Translation" => "applications-accessories",
+            "Calendar" => "x-office-calendar",
+            "ContactManagement" => "x-office-address-book",
+            "Database" => "x-office-spreadsheet",
+            "Dictionary" => "accessories-dictionary",
+            "Chart" => "x-office-presentation",
+            "Email" => "internet-mail",
+            "Finance" => "applications-office",
+            "FlowChart" => "x-office-drawing",
+            "PDA" => "pda",
+            "ProjectManagement" => "applications-office",
+            "Presentation" => "x-office-presentation",
+            "Spreadsheet" => "x-office-spreadsheet",
+            "WordProcessor" => "x-office-document",
+            "2DGraphics" => "applications-graphics",
+            "VectorGraphics" => "applications-graphics",
+            "RasterGraphics" => "applications-graphics",
+            "3DGraphics" => "applications-graphics",
+            "Scanning" => "scanner",
+            "OCR" => "scanner",
+            "Photography" => "camera-photo",
+            "Publishing" => "applications-publishing",
+            "Viewer" => "image-viewer",
+            "TextTools" => "accessories-text-editor",
+            "DesktopSettings" => "preferences-desktop",
+            "HardwareSettings" => "preferences-system",
+            "Printing" => "printer",
+            "PackageManager" => "system-software-install",
+            "Dialup" => "network-wired",
+            "InstantMessaging" => "internet-chat",
+            "Chat" => "internet-chat",
+            "IRCClient" => "internet-chat",
+            "Feed" => "internet-news-reader",
+            "FileTransfer" => "folder-download",
+            "HamRadio" => "audio-input-microphone",
+            "News" => "internet-news-reader",
+            "P2P" => "network-workgroup",
+            "RemoteAccess" => "preferences-system-network",
+            "Telephony" => "phone",
+            "TelephonyTools" => "phone",
+            "VideoConference" => "camera-video",
+            "WebBrowser" => "web-browser",
+            "WebDevelopment" => "applications-development",
+            "Midi" => "audio-x-generic",
+            "Mixer" => "multimedia-volume-control",
+            "Sequencer" => "audio-x-generic",
+            "Tuner" => "multimedia-player",
+            "TV" => "video-display",
+            "AudioVideoEditing" => "applications-multimedia",
+            "Player" => "multimedia-player",
+            "Recorder" => "media-record",
+            "DiscBurning" => "media-optical-recordable",
+            "ActionGame" => "applications-games",
+            "AdventureGame" => "applications-games",
+            "ArcadeGame" => "applications-games",
+            "BoardGame" => "applications-games",
+            "BlocksGame" => "applications-games",
+            "CardGame" => "applications-games",
+            "KidsGame" => "applications-games",
+            "LogicGame" => "applications-games",
+            "RolePlaying" => "applications-games",
+            "Shooter" => "applications-games",
+            "Simulation" => "applications-games",
+            "SportsGame" => "applications-games",
+            "StrategyGame" => "applications-games",
+            "Art" => "applications-graphics",
+            "Construction" => "applications-engineering",
+            "Music" => "applications-multimedia",
+            "Languages" => "applications-education",
+            "ArtificialIntelligence" => "applications-science",
+            "Astronomy" => "applications-science",
+            "Biology" => "applications-science",
+            "Chemistry" => "applications-science",
+            "ComputerScience" => "applications-science",
+            "DataVisualization" => "applications-science",
+            "Economy" => "applications-office",
+            "Electricity" => "applications-science",
+            "Geography" => "applications-science",
+            "Geology" => "applications-science",
+            "Geoscience" => "applications-science",
+            "History" => "applications-education",
+            "Humanities" => "applications-education",
+            "ImageProcessing" => "applications-graphics",
+            "Literature" => "applications-education",
+            "Maps" => "maps",
+            "Math" => "applications-science",
+            "NumericalAnalysis" => "applications-science",
+            "MedicalSoftware" => "applications-science",
+            "Physics" => "applications-science",
+            "Robotics" => "applications-science",
+            "Spirituality" => "applications-education",
+            "Sports" => "applications-games",
+            "ParallelComputing" => "applications-system",
+            "Amusement" => "applications-games",
+            "Archiving" => "package-x-generic",
+            "Compression" => "package-x-generic",
+            "Electronics" => "applications-electronics",
+            "Emulator" => "applications-system",
+            "Engineering" => "applications-engineering",
+            "FileTools" => "system-file-manager",
+            "FileManager" => "system-file-manager",
+            "TerminalEmulator" => "utilities-terminal",
+            "Filesystem" => "drive-harddisk",
+            "Monitor" => "system-monitoring",
+            "Security" => "security-high",
+            "Accessibility" => "preferences-desktop-accessibility",
+            "Calculator" => "accessories-calculator",
+            "Clock" => "preferences-system-time",
+            "TextEditor" => "accessories-text-editor",
+            "Documentation" => "help-browser",
+            "Adult" => "applications-other",
+            "Core" => "applications-system",
+            "KDE" => "kde",
+            "GNOME" => "gnome",
+            "XFCE" => "xfce",
+            "GTK" => "gtk",
+            "Qt" => "qt",
+            "Motif" => "applications-other",
+            "Java" => "applications-development",
+            "ConsoleOnly" => "utilities-terminal",
+
+            _ => continue, // Try next category
+        };
+
+        return Some(icon);
+    }
+
+    // No matching category found
+    None
+}
+
+/// Resolve icon with category fallback for desktop entries
+///
+/// This is the recommended function to use for desktop entries.
+/// Falls back through: explicit icon → category-based icon → generic fallback
+pub fn resolve_icon_with_category_fallback(
+    icon_name: Option<&str>,
+    categories: &[String],
+) -> PathBuf {
+    // Try explicit icon first
+    if let Some(icon) = icon_name {
+        if let Some(path) = resolve_icon(icon) {
+            return path;
+        }
+    }
+
+    // Try category-based fallback
+    if let Some(category_icon) = category_to_icon(categories) {
+        if let Some(path) = resolve_icon(category_icon) {
+            debug!(
+                "Using category fallback icon: {} for categories: {:?}",
+                category_icon, categories
+            );
+            return path;
+        }
+    }
+
+    // Final fallback
+    get_default_icon()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -284,5 +477,81 @@ mod tests {
         let icon2 = resolve_icon("firefox");
 
         assert_eq!(icon1, icon2);
+    }
+
+    #[test]
+    fn test_category_to_icon_development() {
+        let categories = vec!["Development".to_string()];
+        let icon = category_to_icon(&categories);
+        assert_eq!(icon, Some("applications-development"));
+    }
+
+    #[test]
+    fn test_category_to_icon_web_browser() {
+        let categories = vec!["Network".to_string(), "WebBrowser".to_string()];
+        let icon = category_to_icon(&categories);
+        // Should return the first matching category (Network)
+        assert_eq!(icon, Some("applications-internet"));
+    }
+
+    #[test]
+    fn test_category_to_icon_specific_beats_general() {
+        let categories = vec!["WebBrowser".to_string(), "Network".to_string()];
+        let icon = category_to_icon(&categories);
+        // Should return first match (WebBrowser is more specific)
+        assert_eq!(icon, Some("web-browser"));
+    }
+
+    #[test]
+    fn test_category_to_icon_no_match() {
+        let categories = vec!["UnknownCategory".to_string()];
+        let icon = category_to_icon(&categories);
+        assert_eq!(icon, None);
+    }
+
+    #[test]
+    fn test_category_to_icon_empty() {
+        let categories: Vec<String> = vec![];
+        let icon = category_to_icon(&categories);
+        assert_eq!(icon, None);
+    }
+
+    #[test]
+    fn test_resolve_with_category_fallback_explicit_icon() {
+        let categories = vec!["Development".to_string()];
+        // Even though we have categories, explicit icon should be tried first
+        let path = resolve_icon_with_category_fallback(Some("firefox"), &categories);
+        // Should return a non-empty path string
+        assert!(!path.as_os_str().is_empty());
+    }
+
+    #[test]
+    fn test_resolve_with_category_fallback_no_icon() {
+        let categories = vec!["TextEditor".to_string()];
+        // No explicit icon, should use category fallback
+        let path = resolve_icon_with_category_fallback(None, &categories);
+        // Should return a non-empty path string
+        assert!(!path.as_os_str().is_empty());
+    }
+
+    #[test]
+    fn test_resolve_with_category_fallback_unknown_category() {
+        let categories = vec!["UnknownCategory".to_string()];
+        // Unknown category should fall back to default icon
+        let path = resolve_icon_with_category_fallback(None, &categories);
+        let default_path = get_default_icon();
+        assert_eq!(path, default_path);
+    }
+
+    #[test]
+    fn test_category_fallback_priority() {
+        let categories_specific = vec!["WebBrowser".to_string(), "Network".to_string()];
+        let icon_specific = category_to_icon(&categories_specific);
+        // Should match first category
+        assert_eq!(icon_specific, Some("web-browser"));
+
+        let categories_general = vec!["Network".to_string()];
+        let icon_general = category_to_icon(&categories_general);
+        assert_eq!(icon_general, Some("applications-internet"));
     }
 }

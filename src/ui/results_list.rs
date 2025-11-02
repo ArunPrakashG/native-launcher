@@ -1,9 +1,12 @@
 use crate::desktop::{DesktopAction, DesktopEntry};
+use crate::pins::PinsStore;
 use crate::plugins::PluginResult;
+use crate::ui::highlight::apply_highlight;
 use crate::utils::icons::resolve_icon;
 use gtk4::prelude::*;
 use gtk4::{
-    pango::EllipsizeMode, Box as GtkBox, Image, Label, ListBox, Orientation, ScrolledWindow,
+    pango::EllipsizeMode, Align, Box as GtkBox, Image, Label, ListBox, Orientation, Overlay,
+    ScrolledWindow,
 };
 use std::cell::RefCell;
 use std::path::PathBuf;
@@ -34,6 +37,10 @@ pub struct ResultsList {
     pub list: ListBox,
     /// Single flat list: visual order = data order (wrapped in Rc so all clones share same data)
     items: Rc<RefCell<Vec<ListItem>>>,
+    current_query: Rc<RefCell<String>>, // used for match highlighting
+    pins: Rc<RefCell<Option<std::sync::Arc<PinsStore>>>>,
+    /// Hash of current results for fast change detection (optimization)
+    results_hash: Rc<RefCell<u64>>,
 }
 
 impl ResultsList {
@@ -62,7 +69,15 @@ impl ResultsList {
             container,
             list,
             items: Rc::new(RefCell::new(Vec::new())),
+            current_query: Rc::new(RefCell::new(String::new())),
+            pins: Rc::new(RefCell::new(None)),
+            results_hash: Rc::new(RefCell::new(0)),
         }
+    }
+
+    /// Update the query used for highlighting matches
+    pub fn set_query(&self, query: &str) {
+        *self.current_query.borrow_mut() = query.to_string();
     }
 
     /// Update the list with search results (desktop apps)
@@ -95,6 +110,30 @@ impl ResultsList {
 
     /// Update the list with plugin results
     pub fn update_plugin_results(&self, results: Vec<PluginResult>) {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        // OPTIMIZATION: Fast hash-based comparison before expensive UI rebuild
+        // This prevents rebuilding the entire widget tree when results are unchanged
+        let new_hash = {
+            let mut hasher = DefaultHasher::new();
+            for r in &results {
+                r.title.hash(&mut hasher);
+                r.subtitle.hash(&mut hasher);
+                r.score.hash(&mut hasher);
+            }
+            hasher.finish()
+        };
+
+        // Quick exit if results are identical
+        if *self.results_hash.borrow() == new_hash {
+            tracing::debug!("Results unchanged (hash match), skipping UI rebuild");
+            return;
+        }
+
+        // Update hash cache
+        *self.results_hash.borrow_mut() = new_hash;
+
         let items: Vec<ListItem> = results
             .into_iter()
             .map(|result| ListItem::PluginResult { result })
@@ -177,20 +216,19 @@ impl ResultsList {
 
     /// Get the command to execute based on current selection
     pub fn get_selected_command(&self) -> Option<(String, bool)> {
-        let selected_index = self.selected_index()? as usize;
-        let items = self.items.borrow();
-
-        // Validate index is within bounds
-        if selected_index >= items.len() {
-            tracing::error!(
-                "Selected index {} is out of bounds (total items: {})",
-                selected_index,
-                items.len()
-            );
+        let items_ref = self.items.borrow();
+        if items_ref.is_empty() {
             return None;
         }
 
-        items.get(selected_index).map(|item| {
+        // Fallback: if no GTK selection yet, assume first item selected
+        let selected_index = self
+            .selected_index()
+            .map(|i| i as usize)
+            .unwrap_or(0)
+            .min(items_ref.len().saturating_sub(1));
+
+        items_ref.get(selected_index).map(|item| {
             let (cmd, term) = match item {
                 ListItem::App { entry } => (entry.exec.clone(), entry.terminal),
                 ListItem::Action {
@@ -205,17 +243,44 @@ impl ResultsList {
 
     /// Get the desktop file path of the currently selected item
     pub fn get_selected_path(&self) -> Option<String> {
-        let selected_index = self.selected_index()? as usize;
-        let items = self.items.borrow();
+        let items_ref = self.items.borrow();
+        if items_ref.is_empty() {
+            return None;
+        }
 
-        items.get(selected_index).and_then(|item| match item {
+        let selected_index = self
+            .selected_index()
+            .map(|i| i as usize)
+            .unwrap_or(0)
+            .min(items_ref.len().saturating_sub(1));
+
+        items_ref.get(selected_index).and_then(|item| match item {
             ListItem::App { entry } => Some(entry.path.to_string_lossy().to_string()),
             ListItem::Action { parent_entry, .. } => {
                 Some(parent_entry.path.to_string_lossy().to_string())
             }
-            // Plugin results don't have desktop file paths
-            ListItem::PluginResult { .. } => None,
+            // Plugin results may have desktop paths when representing apps
+            ListItem::PluginResult { result } => result.desktop_path.clone(),
         })
+    }
+
+    /// Get the plugin name for the currently selected item (if any)
+    pub fn get_selected_plugin_name(&self) -> Option<String> {
+        let items_ref = self.items.borrow();
+        if items_ref.is_empty() {
+            return None;
+        }
+
+        let selected_index = self
+            .selected_index()
+            .map(|i| i as usize)
+            .unwrap_or(0)
+            .min(items_ref.len().saturating_sub(1));
+
+        match items_ref.get(selected_index) {
+            Some(ListItem::PluginResult { result }) => Some(result.plugin_name.clone()),
+            _ => None,
+        }
     }
 
     /// Create an icon placeholder box for alignment
@@ -281,24 +346,95 @@ impl ResultsList {
             row.add_css_class("inline-action-with-icon");
         }
 
-        // Add icon (with fallback to default icon)
+        // Add icon (emoji or standard icon with fallback)
         let icon_size = if is_linked_entry { 32 } else { 48 };
-        let icon_path = Self::resolve_plugin_icon(result).or_else(|| {
-            use crate::utils::icons::get_default_icon;
-            Some(get_default_icon())
-        });
+        let icon_widget: gtk4::Widget = {
+            // Special-case: emoji icon marker
+            let emoji_widget: Option<gtk4::Widget> = if let Some(icon_str) = result.icon.as_deref()
+            {
+                if let Some(emoji_char) = icon_str.strip_prefix("emoji:") {
+                    let label = Label::new(Some(emoji_char));
+                    label.add_css_class("emoji-icon");
+                    if is_linked_entry {
+                        label.add_css_class("emoji-icon-small");
+                    }
+                    // Ensure consistent sizing
+                    label.set_width_request(icon_size);
+                    label.set_height_request(icon_size);
+                    label.set_halign(Align::Center);
+                    label.set_valign(Align::Center);
+                    Some(label.upcast::<gtk4::Widget>())
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
 
-        if let Some(icon_path) = icon_path {
-            let image = Image::from_file(&icon_path);
-            image.set_pixel_size(icon_size);
-            image.add_css_class("app-icon");
-            if is_linked_entry {
-                image.add_css_class("workspace-icon");
+            if let Some(widget) = emoji_widget {
+                widget
+            } else if let Some(icon_path) = Self::resolve_plugin_icon(result).or_else(|| {
+                use crate::utils::icons::get_default_icon;
+                Some(get_default_icon())
+            }) {
+                let image = Image::from_file(&icon_path);
+                image.set_pixel_size(icon_size);
+                image.add_css_class("app-icon");
+                if is_linked_entry {
+                    image.add_css_class("workspace-icon");
+                }
+
+                // Wrap in overlay if pinned
+                if let Some(path) = result.desktop_path.as_ref() {
+                    if let Some(pins) = &*self.pins.borrow() {
+                        if pins.is_pinned(path) {
+                            let overlay = Overlay::new();
+                            overlay.set_child(Some(&image));
+                            let star = Label::new(Some("★"));
+                            star.add_css_class("pinned-star");
+                            star.set_halign(Align::End);
+                            star.set_valign(Align::Start);
+                            star.set_margin_end(2);
+                            star.set_margin_top(2);
+                            overlay.add_overlay(&star);
+                            overlay.upcast()
+                        } else {
+                            image.upcast()
+                        }
+                    } else {
+                        image.upcast()
+                    }
+                } else {
+                    image.upcast()
+                }
+            } else {
+                // Placeholder box (no icon found)
+                let placeholder = self.create_icon_placeholder(icon_size);
+                if let Some(path) = result.desktop_path.as_ref() {
+                    if let Some(pins) = &*self.pins.borrow() {
+                        if pins.is_pinned(path) {
+                            let overlay = Overlay::new();
+                            overlay.set_child(Some(&placeholder));
+                            let star = Label::new(Some("★"));
+                            star.add_css_class("pinned-star");
+                            star.set_halign(Align::End);
+                            star.set_valign(Align::Start);
+                            star.set_margin_end(2);
+                            star.set_margin_top(2);
+                            overlay.add_overlay(&star);
+                            overlay.upcast()
+                        } else {
+                            placeholder.upcast()
+                        }
+                    } else {
+                        placeholder.upcast()
+                    }
+                } else {
+                    placeholder.upcast()
+                }
             }
-            row.append(&image);
-        } else {
-            row.append(&self.create_icon_placeholder(icon_size));
-        }
+        };
+        row.append(&icon_widget);
 
         // Main content box (vertical layout for title and subtitle)
         let content_box = GtkBox::builder()
@@ -307,9 +443,17 @@ impl ResultsList {
             .hexpand(true)
             .build();
 
+        // Title row (horizontal box for title + optional badge)
+        let title_row = GtkBox::builder()
+            .orientation(Orientation::Horizontal)
+            .spacing(6)
+            .build();
+
         // Title
+        let name_markup = apply_highlight(&result.title, &self.current_query.borrow());
         let name_label = Label::builder()
-            .label(&result.title)
+            .use_markup(true)
+            .label(&name_markup)
             .halign(gtk4::Align::Start)
             .xalign(0.0)
             .build();
@@ -319,12 +463,25 @@ impl ResultsList {
         name_label.set_ellipsize(EllipsizeMode::End);
         name_label.set_max_width_chars(60);
 
-        content_box.append(&name_label);
+        title_row.append(&name_label);
+
+        // Badge icon (if specified)
+        if let Some(ref badge_name) = result.badge_icon {
+            let badge_icon = Image::from_icon_name(badge_name);
+            badge_icon.set_pixel_size(16);
+            badge_icon.add_css_class("result-badge");
+            badge_icon.set_valign(gtk4::Align::Center);
+            title_row.append(&badge_icon);
+        }
+
+        content_box.append(&title_row);
 
         // Subtitle (if available)
         if let Some(ref subtitle) = result.subtitle {
+            let subtitle_markup = apply_highlight(subtitle, &self.current_query.borrow());
             let subtitle_label = Label::builder()
-                .label(subtitle)
+                .use_markup(true)
+                .label(&subtitle_markup)
                 .halign(gtk4::Align::Start)
                 .xalign(0.0)
                 .build();
@@ -361,14 +518,56 @@ impl ResultsList {
                 Some(get_default_icon())
             });
 
-        if let Some(icon_path) = icon_path {
-            let image = Image::from_file(&icon_path);
-            image.set_pixel_size(48);
-            image.add_css_class("app-icon");
-            row.append(&image);
-        } else {
-            row.append(&self.create_icon_placeholder(48));
-        }
+        // Icon with optional pin overlay
+        let icon_widget: gtk4::Widget = {
+            if let Some(icon_path) = icon_path {
+                let image = Image::from_file(&icon_path);
+                image.set_pixel_size(48);
+                image.add_css_class("app-icon");
+                // Check pin state
+                if let Some(pins) = &*self.pins.borrow() {
+                    let path = entry.path.to_string_lossy().to_string();
+                    if pins.is_pinned(&path) {
+                        let overlay = Overlay::new();
+                        overlay.set_child(Some(&image));
+                        let star = Label::new(Some("★"));
+                        star.add_css_class("pinned-star");
+                        star.set_halign(Align::End);
+                        star.set_valign(Align::Start);
+                        star.set_margin_end(2);
+                        star.set_margin_top(2);
+                        overlay.add_overlay(&star);
+                        overlay.upcast()
+                    } else {
+                        image.upcast()
+                    }
+                } else {
+                    image.upcast()
+                }
+            } else {
+                let placeholder = self.create_icon_placeholder(48);
+                if let Some(pins) = &*self.pins.borrow() {
+                    let path = entry.path.to_string_lossy().to_string();
+                    if pins.is_pinned(&path) {
+                        let overlay = Overlay::new();
+                        overlay.set_child(Some(&placeholder));
+                        let star = Label::new(Some("★"));
+                        star.add_css_class("pinned-star");
+                        star.set_halign(Align::End);
+                        star.set_valign(Align::Start);
+                        star.set_margin_end(2);
+                        star.set_margin_top(2);
+                        overlay.add_overlay(&star);
+                        overlay.upcast()
+                    } else {
+                        placeholder.upcast()
+                    }
+                } else {
+                    placeholder.upcast()
+                }
+            }
+        };
+        row.append(&icon_widget);
 
         // Main content box (vertical layout for name and generic name)
         let content_box = GtkBox::builder()
@@ -378,8 +577,10 @@ impl ResultsList {
             .build();
 
         // Application name
+        let name_markup = apply_highlight(&entry.name, &self.current_query.borrow());
         let name_label = Label::builder()
-            .label(&entry.name)
+            .use_markup(true)
+            .label(&name_markup)
             .halign(gtk4::Align::Start)
             .xalign(0.0)
             .build();
@@ -393,8 +594,10 @@ impl ResultsList {
 
         // Generic name (if available)
         if let Some(ref generic) = entry.generic_name {
+            let generic_markup = apply_highlight(generic, &self.current_query.borrow());
             let generic_label = Label::builder()
-                .label(generic)
+                .use_markup(true)
+                .label(&generic_markup)
                 .halign(gtk4::Align::Start)
                 .xalign(0.0)
                 .build();
@@ -458,6 +661,15 @@ impl ResultsList {
         }
     }
 
+    /// Select the first item (useful for keyboard shortcuts)
+    pub fn select_first(&self) {
+        if let Some(first_row) = self.list.row_at_index(0) {
+            self.list.select_row(Some(&first_row));
+            self.scroll_to_selected();
+            info!("Selected first row (Ctrl+1 shortcut)");
+        }
+    }
+
     /// Scroll to the currently selected item
     fn scroll_to_selected(&self) {
         if let Some(selected_row) = self.list.selected_row() {
@@ -488,6 +700,24 @@ impl ResultsList {
 }
 
 impl ResultsList {
+    /// Provide pins store to this widget (for star indicators)
+    pub fn set_pins_store(&self, pins: std::sync::Arc<PinsStore>) {
+        *self.pins.borrow_mut() = Some(pins);
+    }
+
+    /// Re-render current items (used after toggling pins to refresh stars)
+    #[allow(dead_code)]
+    pub fn rerender(&self) {
+        let selected = self.selected_index();
+        let items = self.items.borrow().clone();
+        self.render_items(items);
+        if let Some(idx) = selected {
+            if let Some(row) = self.list.row_at_index(idx) {
+                self.list.select_row(Some(&row));
+            }
+        }
+    }
+
     fn resolve_plugin_icon(result: &PluginResult) -> Option<PathBuf> {
         if let Some(icon_name) = result.icon.as_deref() {
             if let Some(path) = resolve_icon(icon_name) {

@@ -1,12 +1,14 @@
 use super::traits::{Plugin, PluginContext, PluginResult};
 use super::LauncherPlugin;
 use super::{
-    AdvancedCalculatorPlugin, ApplicationsPlugin, CalculatorPlugin, EditorsPlugin,
-    FileBrowserPlugin, ScreenshotPlugin, ShellPlugin, SshPlugin, ThemeSwitcherPlugin,
-    WebSearchPlugin,
+    AdvancedCalculatorPlugin, ApplicationsPlugin, BrowserHistoryPlugin, CalculatorPlugin,
+    ClipboardPlugin, EditorsPlugin, EmojiPlugin, FileBrowserPlugin, GitProjectsPlugin,
+    RecentDocumentsPlugin, ScreenshotPlugin, SessionSwitcherPlugin, ShellPlugin, SshPlugin,
+    ThemeSwitcherPlugin, WebSearchPlugin, WindowManagementPlugin,
 };
 use crate::config::Config;
 use crate::desktop::DesktopEntryArena;
+use crate::pins::PinsStore;
 use crate::usage::UsageTracker;
 use crate::utils::exec::{register_open_handler, CommandOpenHandler, OpenHandlerPriority};
 use anyhow::Result;
@@ -55,6 +57,11 @@ fn ensure_builtin_open_handlers_registered() {
 }
 
 fn register_filesystem_open_handler() {
+    // Avoid duplicate registration if already present
+    if crate::utils::exec::has_plugin_open_handler("filesystem-open") {
+        return;
+    }
+
     let handler = CommandOpenHandler {
         command: "xdg-open".to_string(),
         args: Vec::new(),
@@ -126,6 +133,7 @@ impl PluginManager {
     pub fn new(
         entry_arena: DesktopEntryArena,
         usage_tracker: Option<UsageTracker>,
+        pins: Option<std::sync::Arc<PinsStore>>,
         config: &Config,
     ) -> Self {
         ensure_builtin_open_handlers_registered();
@@ -139,9 +147,8 @@ impl PluginManager {
         let mut plugins: Vec<Box<dyn Plugin>> = Vec::new();
 
         // Applications plugin (always enabled, highest priority)
-        let apps_plugin = usage_tracker
-            .map(|tracker| ApplicationsPlugin::with_usage_tracking(entry_arena.clone(), tracker))
-            .unwrap_or_else(|| ApplicationsPlugin::new(entry_arena.clone()));
+        let apps_plugin =
+            ApplicationsPlugin::with_usage_and_pins(entry_arena.clone(), usage_tracker, pins);
         plugins.push(Box::new(apps_plugin));
 
         // Calculator plugin (basic math)
@@ -191,6 +198,41 @@ impl PluginManager {
             plugins.push(Box::new(ScreenshotPlugin::new()));
         }
 
+        // Emoji plugin
+        if config.plugins.emoji {
+            plugins.push(Box::new(EmojiPlugin::new()));
+        }
+
+        // Clipboard history plugin
+        if config.plugins.clipboard {
+            plugins.push(Box::new(ClipboardPlugin::new()));
+        }
+
+        // Browser history plugin
+        if config.plugins.browser_history {
+            plugins.push(Box::new(BrowserHistoryPlugin::new()));
+        }
+
+        // Recent documents plugin
+        if config.plugins.recent_documents {
+            plugins.push(Box::new(RecentDocumentsPlugin::new()));
+        }
+
+        // Window management plugin
+        if config.plugins.window_management {
+            plugins.push(Box::new(WindowManagementPlugin::new()));
+        }
+
+        // Session switcher plugin
+        if config.plugins.session_switcher {
+            plugins.push(Box::new(SessionSwitcherPlugin::new(true)));
+        }
+
+        // Git projects plugin
+        if config.plugins.git_projects {
+            plugins.push(Box::new(GitProjectsPlugin::new(true)));
+        }
+
         // Theme switcher plugin (always enabled)
         plugins.push(Box::new(ThemeSwitcherPlugin::new(config.clone())));
 
@@ -217,8 +259,8 @@ impl PluginManager {
     /// Otherwise, perform global search across all plugins
     pub fn search(&self, query: &str, max_results: usize) -> Result<Vec<PluginResult>> {
         let mut context = PluginContext::new(max_results, &self.config);
-        // Pre-allocate for max_results to avoid reallocations
-        let mut all_results = Vec::with_capacity(max_results);
+        // Pre-allocate for max_results * 2 to reduce reallocations during plugin aggregation
+        let mut all_results = Vec::with_capacity(max_results * 2);
 
         // Check if query starts with @ or $ command prefix
         let is_command_query = query.starts_with('@') || query.starts_with('$');
@@ -251,7 +293,7 @@ impl PluginManager {
 
             // First pass: Applications plugin only
             for plugin in &self.plugins {
-                if plugin.enabled() && plugin.name() == "Applications" {
+                if plugin.enabled() && plugin.name() == "applications" {
                     if plugin.should_handle(query) {
                         let results = plugin.search(query, &context)?;
                         // Count high-quality app matches (score >= 700)
@@ -268,7 +310,7 @@ impl PluginManager {
             // Second pass: All other plugins
             for plugin in &self.plugins {
                 if plugin.enabled()
-                    && plugin.name() != "Applications"
+                    && plugin.name() != "applications"
                     && plugin.should_handle(query)
                 {
                     let results = plugin.search(query, &context)?;
@@ -364,7 +406,7 @@ impl PluginManager {
                 }
 
                 // Track app matches for smart triggering
-                if plugin.name() == "Applications" {
+                if plugin.name() == "applications" {
                     app_results_count = results.iter().filter(|r| r.score >= 700).count();
                 }
 
@@ -465,7 +507,9 @@ impl PluginManager {
 mod tests {
     use super::*;
     use crate::desktop::{DesktopEntry, DesktopEntryArena};
-    use crate::utils::exec::{handler_counts_for_test, reset_open_handlers_for_test};
+    use crate::utils::exec::{
+        handler_counts_for_test, open_handler_test_lock, reset_open_handlers_for_test,
+    };
     use std::path::PathBuf;
     use urlencoding::encode;
 
@@ -495,11 +539,12 @@ mod tests {
 
     #[test]
     fn test_plugin_manager_creation() {
+        let _guard = open_handler_test_lock().lock().unwrap();
         reset_handlers_to_builtin();
         let entries = vec![create_test_entry("Firefox")];
         let arena = DesktopEntryArena::from_vec(entries);
         let config = create_test_config();
-        let manager = PluginManager::new(arena, None, &config);
+        let manager = PluginManager::new(arena, None, None, &config);
 
         let enabled = manager.enabled_plugins();
         assert!(enabled.contains(&"applications"));
@@ -514,11 +559,12 @@ mod tests {
 
     #[test]
     fn test_calculator_search() {
+        let _guard = open_handler_test_lock().lock().unwrap();
         reset_handlers_to_builtin();
         let entries = Vec::new();
         let arena = DesktopEntryArena::from_vec(entries);
         let config = create_test_config();
-        let manager = PluginManager::new(arena, None, &config);
+        let manager = PluginManager::new(arena, None, None, &config);
 
         let results = manager.search("2+2", 10).unwrap();
         assert!(!results.is_empty());
@@ -528,11 +574,12 @@ mod tests {
 
     #[test]
     fn test_shell_search() {
+        let _guard = open_handler_test_lock().lock().unwrap();
         reset_handlers_to_builtin();
         let entries = Vec::new();
         let arena = DesktopEntryArena::from_vec(entries);
         let config = create_test_config();
-        let manager = PluginManager::new(arena, None, &config);
+        let manager = PluginManager::new(arena, None, None, &config);
 
         let results = manager.search(">ls -la", 10).unwrap();
         assert!(!results.is_empty());
@@ -542,16 +589,17 @@ mod tests {
 
     #[test]
     fn registers_filesystem_handler_once() {
+        let _guard = open_handler_test_lock().lock().unwrap();
         reset_handlers_to_builtin();
 
         let arena = DesktopEntryArena::from_vec(Vec::new());
         let config = Config::default();
-        let _manager = PluginManager::new(arena, None, &config);
+        let _manager = PluginManager::new(arena, None, None, &config);
         assert_eq!(handler_counts_for_test(), (1, 0));
 
         // Creating another manager should not add duplicates
         let arena2 = DesktopEntryArena::from_vec(Vec::new());
-        let _manager2 = PluginManager::new(arena2, None, &config);
+        let _manager2 = PluginManager::new(arena2, None, None, &config);
         assert_eq!(handler_counts_for_test(), (1, 0));
 
         reset_handlers_to_builtin();

@@ -6,6 +6,7 @@
 //! - Browser-related operations
 
 use crate::plugins;
+use crate::plugins::traits::Plugin;
 
 /// Detect if query is a web search and extract engine + search term + URL
 ///
@@ -17,11 +18,17 @@ use crate::plugins;
 ///
 /// # Examples
 /// ```
+/// use native_launcher::utils::browser::detect_web_search;
 /// let result = detect_web_search("g rust lang");
-/// assert_eq!(result, Some(("google".to_string(), "rust lang".to_string(), "https://...")));
+/// assert!(result.is_some());
 /// ```
+#[cfg_attr(not(test), allow(dead_code))]
 pub fn detect_web_search(query: &str) -> Option<(String, String, String)> {
     let web_search = plugins::WebSearchPlugin::new();
+    // Respect plugin's should_handle to avoid suggesting web search during other @-commands
+    if !web_search.should_handle(query) {
+        return None;
+    }
     web_search.build_search_url(query)
 }
 
@@ -41,9 +48,11 @@ pub fn detect_web_search(query: &str) -> Option<(String, String, String)> {
 ///
 /// # Examples
 /// ```
+/// use native_launcher::utils::get_default_browser;
 /// let browser = get_default_browser();
-/// println!("Search in {}", browser); // "Search in Firefox"
+/// assert!(!browser.is_empty());
 /// ```
+#[allow(dead_code)]
 pub fn get_default_browser() -> String {
     // Try to get default browser from xdg-settings
     if let Ok(output) = std::process::Command::new("xdg-settings")

@@ -1,6 +1,6 @@
 [package]
 name = "native-launcher"
-version = "0.1.2"
+version = "0.2.0"
 edition = "2021"
 authors = ["Arun Prakash <hi@arunprakashg.com>"]
 description = "A modern application launcher for Linux with Wayland support"
@@ -74,6 +74,12 @@ libloading = "0.8"
 # URL encoding (for web search plugin)
 urlencoding = "2.1"
 
+# SQLite database access (for browser history plugin)
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+# Parallel processing for faster searches
+rayon = "1.10"
+
 [dev-dependencies]
 criterion = "0.5"
 
@@ -87,9 +93,11 @@ harness = false
 
 [profile.release]
 opt-level = 3
-lto = true
-codegen-units = 1
-strip = true
+lto = "fat"             # Aggressive LTO across all dependencies
+codegen-units = 1       # Single codegen unit for better optimization
+strip = true            # Strip symbols
+panic = "abort"         # Smaller binary, no unwinding overhead
+overflow-checks = false # Disable overflow checks in release
 
 [profile.dev]
 opt-level = 0

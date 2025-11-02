@@ -709,6 +709,8 @@ impl Plugin for EditorsPlugin {
                 plugin_name: self.name().to_string(),
                 sub_results: Vec::new(),
                 parent_app: Some(workspace.editor.clone()),
+                desktop_path: None,
+                badge_icon: None, // No badge for editor workspaces
             });
 
             if results.len() >= context.max_results {

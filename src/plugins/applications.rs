@@ -1,15 +1,19 @@
 use super::traits::{Plugin, PluginContext, PluginResult};
 use crate::desktop::{DesktopEntry, DesktopEntryArena, SharedDesktopEntry};
+use crate::pins::PinsStore;
 use crate::usage::UsageTracker;
+use crate::utils::icons::resolve_icon_with_category_fallback;
 use anyhow::Result;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
+use std::sync::Arc;
 
 /// Plugin for searching desktop applications
 pub struct ApplicationsPlugin {
     entries: DesktopEntryArena,
     matcher: SkimMatcherV2,
     usage_tracker: Option<UsageTracker>,
+    pins: Option<Arc<PinsStore>>,
 }
 
 impl std::fmt::Debug for ApplicationsPlugin {
@@ -28,6 +32,7 @@ impl ApplicationsPlugin {
             entries,
             matcher: SkimMatcherV2::default(),
             usage_tracker: None,
+            pins: None,
         }
     }
 
@@ -37,6 +42,21 @@ impl ApplicationsPlugin {
             entries,
             matcher: SkimMatcherV2::default(),
             usage_tracker: Some(usage_tracker),
+            pins: None,
+        }
+    }
+
+    /// Create with usage tracking and pins
+    pub fn with_usage_and_pins(
+        entries: DesktopEntryArena,
+        usage_tracker: Option<UsageTracker>,
+        pins: Option<Arc<PinsStore>>,
+    ) -> Self {
+        Self {
+            entries,
+            matcher: SkimMatcherV2::default(),
+            usage_tracker,
+            pins,
         }
     }
 
@@ -128,35 +148,86 @@ impl Plugin for ApplicationsPlugin {
         if query.is_empty() {
             let mut results: Vec<_> = self.entries.iter().cloned().collect();
 
-            if let Some(tracker) = &self.usage_tracker {
-                results.sort_by(|a, b| {
-                    let score_a = tracker.get_score(&a.path.to_string_lossy());
-                    let score_b = tracker.get_score(&b.path.to_string_lossy());
-                    score_b
-                        .partial_cmp(&score_a)
-                        .unwrap_or(std::cmp::Ordering::Equal)
-                        .then_with(|| a.name.cmp(&b.name))
-                });
-            } else {
-                results.sort_by(|a, b| a.name.cmp(&b.name));
-            }
+            let tracker_opt = &self.usage_tracker;
+            let pins_opt = &self.pins;
 
-            return Ok(results
+            // Sort by pinned first, then usage score, then name (stable across runs)
+            results.sort_by(|a, b| {
+                let a_path = a.path.to_string_lossy().to_string();
+                let b_path = b.path.to_string_lossy().to_string();
+                let a_pinned = pins_opt
+                    .as_ref()
+                    .map(|p| p.is_pinned(&a_path))
+                    .unwrap_or(false);
+                let b_pinned = pins_opt
+                    .as_ref()
+                    .map(|p| p.is_pinned(&b_path))
+                    .unwrap_or(false);
+
+                b_pinned
+                    .cmp(&a_pinned)
+                    .then_with(|| {
+                        if let Some(tracker) = tracker_opt {
+                            let score_a = tracker.get_score(&a_path);
+                            let score_b = tracker.get_score(&b_path);
+                            score_b
+                                .partial_cmp(&score_a)
+                                .unwrap_or(std::cmp::Ordering::Equal)
+                        } else {
+                            std::cmp::Ordering::Equal
+                        }
+                    })
+                    .then_with(|| a.name.cmp(&b.name))
+            });
+
+            // Encode sort into score so global manager sort preserves ordering
+            let mapped: Vec<PluginResult> = results
                 .into_iter()
                 .take(context.max_results)
                 .map(|entry| {
                     let entry = entry.as_ref();
-                    PluginResult::new(
+                    let path = entry.path.to_string_lossy().to_string();
+                    let pinned = pins_opt
+                        .as_ref()
+                        .map(|p| p.is_pinned(&path))
+                        .unwrap_or(false);
+                    let usage = tracker_opt
+                        .as_ref()
+                        .map(|t| t.get_score(&path))
+                        .unwrap_or(0.0);
+                    // Large boost for pinned to ensure they appear first globally
+                    let pin_boost: i64 = if pinned { 1_000_000 } else { 0 };
+                    // Scale usage to i64; usage is typically small (<10)
+                    let usage_points: i64 = (usage * 1000.0).round() as i64;
+                    let score = pin_boost + usage_points;
+
+                    // Resolve icon with category fallback
+                    let icon_path = resolve_icon_with_category_fallback(
+                        entry.icon.as_deref(),
+                        &entry.categories,
+                    );
+
+                    let mut result = PluginResult::new(
                         entry.name.clone(),
                         entry.exec.clone(),
                         self.name().to_string(),
                     )
                     .with_subtitle(entry.generic_name.clone().unwrap_or_default())
-                    .with_icon(entry.icon.clone().unwrap_or_default())
+                    .with_icon(icon_path.to_string_lossy().to_string())
                     .with_terminal(entry.terminal)
-                    .with_score(0)
+                    .with_desktop_path(path)
+                    .with_score(score);
+
+                    // Add terminal badge for terminal apps
+                    if entry.terminal {
+                        result = result.with_badge_icon("utilities-terminal-symbolic".to_string());
+                    }
+
+                    result
                 })
-                .collect());
+                .collect();
+
+            return Ok(mapped);
         }
 
         // Score entries using fuzzy matching + usage boost
@@ -167,12 +238,20 @@ impl Plugin for ApplicationsPlugin {
                 let fuzzy_score = self.calculate_fuzzy_score(entry.as_ref(), &query_lower);
 
                 if fuzzy_score > 0 {
-                    let final_score = if let Some(tracker) = &self.usage_tracker {
+                    let mut final_score = if let Some(tracker) = &self.usage_tracker {
                         let usage_score = tracker.get_score(&entry.path.to_string_lossy());
                         fuzzy_score as f64 * (1.0 + usage_score * 0.1)
                     } else {
                         fuzzy_score as f64
                     };
+
+                    // Apply pin boost if applicable
+                    if let Some(pins) = &self.pins {
+                        if pins.is_pinned(&entry.path.to_string_lossy()) {
+                            // Lightweight boost to float pinned apps higher without breaking exact-match intent
+                            final_score += 2000.0;
+                        }
+                    }
 
                     Some((entry.clone(), final_score))
                 } else {
@@ -195,15 +274,28 @@ impl Plugin for ApplicationsPlugin {
             .take(context.max_results)
             .map(|(entry, score)| {
                 let entry = entry.as_ref();
-                PluginResult::new(
+
+                // Resolve icon with category fallback
+                let icon_path =
+                    resolve_icon_with_category_fallback(entry.icon.as_deref(), &entry.categories);
+
+                let mut result = PluginResult::new(
                     entry.name.clone(),
                     entry.exec.clone(),
                     self.name().to_string(),
                 )
                 .with_subtitle(entry.generic_name.clone().unwrap_or_default())
-                .with_icon(entry.icon.clone().unwrap_or_default())
+                .with_icon(icon_path.to_string_lossy().to_string())
                 .with_terminal(entry.terminal)
-                .with_score(score as i64)
+                .with_desktop_path(entry.path.to_string_lossy().to_string())
+                .with_score(score as i64);
+
+                // Add terminal badge for terminal apps
+                if entry.terminal {
+                    result = result.with_badge_icon("utilities-terminal-symbolic".to_string());
+                }
+
+                result
             })
             .collect())
     }

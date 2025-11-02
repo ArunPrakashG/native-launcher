@@ -81,6 +81,14 @@ impl SearchEngine {
 
         let query_lower = query.to_lowercase();
 
+        // Minimum score threshold to reduce false positives
+        // For short queries (1-2 chars), require higher scores
+        let min_score = if query.len() <= 2 {
+            50 // Higher threshold for short queries
+        } else {
+            20 // Lower threshold for longer queries
+        };
+
         // Score entries using fuzzy matching + usage boost
         let mut results: Vec<(SharedDesktopEntry, f64)> = self
             .entries
@@ -91,7 +99,7 @@ impl SearchEngine {
                 // Calculate fuzzy match score
                 let fuzzy_score = self.calculate_fuzzy_score(entry_ref, &query_lower);
 
-                if fuzzy_score > 0 {
+                if fuzzy_score > min_score {
                     // Apply usage boost if tracking is enabled
                     let final_score = if let Some(tracker) = usage_tracker {
                         let usage_score = tracker.get_score(&entry.path.to_string_lossy());
@@ -127,38 +135,74 @@ impl SearchEngine {
 
     /// Calculate fuzzy match score for an entry
     #[allow(dead_code)]
-
+    #[inline(always)] // Force inlining for hot path
     fn calculate_fuzzy_score(&self, entry: &DesktopEntry, query: &str) -> i64 {
         let mut best_score = 0i64;
 
-        // 1. Try exact match first (highest priority)
+        // Cache lowercase conversions for performance
         let name_lower = entry.name.to_lowercase();
-        if name_lower.contains(query) {
+        let query_lower = query.to_lowercase();
+
+        // 1. Try exact match first (highest priority)
+        if name_lower.contains(&query_lower) {
             // Exact substring match gets huge bonus
             best_score = best_score.max(10000 + (1000 / (name_lower.len() as i64 + 1)));
 
             // Extra bonus for prefix match
-            if name_lower.starts_with(query) {
+            if name_lower.starts_with(&query_lower) {
                 best_score += 5000;
             }
 
             // Extra bonus if it's the whole name (exact match)
-            if name_lower == query {
+            if name_lower == query_lower {
                 best_score += 10000;
+            }
+
+            // Case-sensitive exact match bonus (user typed exact case)
+            if entry.name.contains(query) {
+                best_score += 2000;
             }
         }
 
-        // 2. Fuzzy match on name (primary field)
+        // 2. Acronym matching (e.g., "vsc" matches "Visual Studio Code")
+        if query.len() >= 2 {
+            let acronym_score = self.match_acronym(&entry.name, query);
+            if acronym_score > 0 {
+                best_score = best_score.max(8000 + acronym_score);
+            }
+
+            // Also try generic name for acronyms
+            if let Some(ref generic) = entry.generic_name {
+                let generic_acronym_score = self.match_acronym(generic, query);
+                if generic_acronym_score > 0 {
+                    best_score = best_score.max(6000 + generic_acronym_score);
+                }
+            }
+        }
+
+        // 3. Word boundary matching (e.g., "vs" matches "Visual Studio")
+        let word_boundary_score = self.match_word_boundaries(&entry.name, &query_lower);
+        if word_boundary_score > 0 {
+            best_score = best_score.max(7000 + word_boundary_score);
+        }
+
+        // 4. Fuzzy match on name (primary field)
         if let Some(score) = self.matcher.fuzzy_match(&entry.name, query) {
             best_score = best_score.max(score * 3); // 3x weight for name
         }
 
-        // 3. Fuzzy match on generic name (secondary field)
+        // 5. Fuzzy match on generic name (secondary field)
         if let Some(ref generic) = entry.generic_name {
             let generic_lower = generic.to_lowercase();
             // Check for exact match in generic name too
-            if generic_lower.contains(query) {
+            if generic_lower.contains(&query_lower) {
                 best_score = best_score.max(5000);
+
+                // Word boundary bonus for generic name
+                let generic_word_score = self.match_word_boundaries(generic, &query_lower);
+                if generic_word_score > 0 {
+                    best_score = best_score.max(5500 + generic_word_score);
+                }
             }
 
             if let Some(score) = self.matcher.fuzzy_match(generic, query) {
@@ -166,14 +210,31 @@ impl SearchEngine {
             }
         }
 
-        // 4. Fuzzy match on keywords (tertiary field)
+        // 6. Match on exec field (for technical users searching by command name)
+        if query.len() >= 3 {
+            let exec_lower = entry.exec.to_lowercase();
+            if exec_lower.contains(&query_lower) {
+                // Lower priority than name matches but still relevant
+                best_score = best_score.max(3000);
+            }
+        }
+
+        // 7. Fuzzy match on keywords (tertiary field)
         for keyword in &entry.keywords {
+            let keyword_lower = keyword.to_lowercase();
+            // Exact keyword match gets priority
+            if keyword_lower == query_lower {
+                best_score = best_score.max(4000);
+            } else if keyword_lower.contains(&query_lower) {
+                best_score = best_score.max(2000);
+            }
+
             if let Some(score) = self.matcher.fuzzy_match(keyword, query) {
                 best_score = best_score.max(score); // 1x weight for keywords
             }
         }
 
-        // 5. Fuzzy match on categories (low priority - only if query is >3 chars)
+        // 8. Fuzzy match on categories (only if query is >3 chars to reduce false positives)
         if query.len() > 3 {
             for category in &entry.categories {
                 if let Some(score) = self.matcher.fuzzy_match(category, query) {
@@ -183,6 +244,73 @@ impl SearchEngine {
         }
 
         best_score
+    }
+
+    /// Match acronym patterns (e.g., "vsc" matches "Visual Studio Code")
+    #[inline]
+    fn match_acronym(&self, text: &str, query: &str) -> i64 {
+        let query_chars: Vec<char> = query.chars().collect();
+        if query_chars.is_empty() {
+            return 0;
+        }
+
+        let words: Vec<&str> = text.split_whitespace().collect();
+        if words.len() < query_chars.len() {
+            return 0;
+        }
+
+        // Check if query chars match word initials
+        let mut query_idx = 0;
+        let mut matched_positions = Vec::new();
+
+        for (word_idx, word) in words.iter().enumerate() {
+            if query_idx >= query_chars.len() {
+                break;
+            }
+
+            let first_char = word.chars().next();
+            if let Some(fc) = first_char {
+                if fc.to_lowercase().eq(query_chars[query_idx].to_lowercase()) {
+                    matched_positions.push(word_idx);
+                    query_idx += 1;
+                }
+            }
+        }
+
+        // Full acronym match
+        if query_idx == query_chars.len() {
+            // Bonus for consecutive words
+            let consecutiveness = if matched_positions.windows(2).all(|w| w[1] == w[0] + 1) {
+                500
+            } else {
+                0
+            };
+            return 1000 + consecutiveness;
+        }
+
+        0
+    }
+
+    /// Match word boundaries (e.g., "code" matches "Visual Studio Code")
+    #[inline]
+    fn match_word_boundaries(&self, text: &str, query_lower: &str) -> i64 {
+        let text_lower = text.to_lowercase();
+        let words: Vec<&str> = text_lower.split_whitespace().collect();
+
+        for (idx, word) in words.iter().enumerate() {
+            // Exact word match
+            if *word == query_lower {
+                // Earlier words get higher score
+                return 1000 - (idx as i64 * 100);
+            }
+
+            // Word starts with query
+            if word.starts_with(query_lower) {
+                return 800 - (idx as i64 * 100);
+            }
+        }
+
+        0
     }
 
     /// Update the entries in the search engine
@@ -355,5 +483,170 @@ mod tests {
             non_usage_results.first().map(|entry| entry.name.as_str()),
             Some("Alpha Editor")
         );
+    }
+
+    #[test]
+    fn test_acronym_matching() {
+        let entries = vec![
+            create_test_entry("Visual Studio Code", Some("Code Editor"), vec![]),
+            create_test_entry("VLC Media Player", Some("Media Player"), vec![]),
+            create_test_entry("Vim", Some("Text Editor"), vec![]),
+        ];
+
+        let arena = DesktopEntryArena::from_vec(entries);
+        let engine = SearchEngine::new(arena, false);
+
+        // "vsc" should match "Visual Studio Code" via acronym
+        let results = engine.search("vsc", 10);
+        assert!(!results.is_empty());
+        assert_eq!(results[0].name, "Visual Studio Code");
+
+        // "vlc" should match "VLC Media Player" via acronym
+        let results = engine.search("vlc", 10);
+        assert!(!results.is_empty());
+        assert_eq!(results[0].name, "VLC Media Player");
+    }
+
+    #[test]
+    fn test_word_boundary_matching() {
+        let entries = vec![
+            create_test_entry("Visual Studio", Some("IDE"), vec![]),
+            create_test_entry("Android Studio", Some("IDE"), vec![]),
+            create_test_entry("Studio One", Some("DAW"), vec![]),
+        ];
+
+        let arena = DesktopEntryArena::from_vec(entries);
+        let engine = SearchEngine::new(arena, false);
+
+        // "studio" should match all entries containing word "studio"
+        let results = engine.search("studio", 10);
+        assert_eq!(results.len(), 3);
+
+        // Earlier word occurrences should rank higher
+        // "Visual Studio" has "Studio" in second position
+        // "Android Studio" has "Studio" in second position
+        // "Studio One" has "Studio" in first position - should rank highest
+        assert_eq!(results[0].name, "Studio One");
+    }
+
+    #[test]
+    fn test_exec_field_matching() {
+        let entries = vec![
+            DesktopEntry {
+                name: "Firefox".to_string(),
+                generic_name: Some("Web Browser".to_string()),
+                exec: "firefox %u".to_string(),
+                icon: None,
+                categories: vec![],
+                keywords: vec![],
+                terminal: false,
+                path: PathBuf::from("/firefox.desktop"),
+                no_display: false,
+                actions: vec![],
+            },
+            DesktopEntry {
+                name: "Chrome".to_string(),
+                generic_name: Some("Web Browser".to_string()),
+                exec: "google-chrome %u".to_string(),
+                icon: None,
+                categories: vec![],
+                keywords: vec![],
+                terminal: false,
+                path: PathBuf::from("/chrome.desktop"),
+                no_display: false,
+                actions: vec![],
+            },
+        ];
+
+        let arena = DesktopEntryArena::from_vec(entries);
+        let engine = SearchEngine::new(arena, false);
+
+        // "google-chrome" should match Chrome by exec field
+        let results = engine.search("google-chrome", 10);
+        assert!(!results.is_empty());
+        assert_eq!(results[0].name, "Chrome");
+    }
+
+    #[test]
+    fn test_case_sensitivity_bonus() {
+        let entries = vec![
+            create_test_entry("Firefox", Some("Web Browser"), vec![]),
+            create_test_entry("firefox-esr", Some("Web Browser ESR"), vec![]),
+        ];
+
+        let arena = DesktopEntryArena::from_vec(entries);
+        let engine = SearchEngine::new(arena, false);
+
+        // Exact case match "Firefox" should rank higher than "firefox"
+        let results = engine.search("Firefox", 10);
+        assert!(!results.is_empty());
+        assert_eq!(results[0].name, "Firefox");
+    }
+
+    #[test]
+    fn test_minimum_score_threshold() {
+        let entries = vec![
+            create_test_entry("Firefox", Some("Web Browser"), vec![]),
+            create_test_entry("Files", Some("File Manager"), vec![]),
+            create_test_entry("Calculator", Some("Calculator"), vec![]),
+        ];
+
+        let arena = DesktopEntryArena::from_vec(entries);
+        let engine = SearchEngine::new(arena, false);
+
+        // Short query with weak match should not return false positives
+        let results = engine.search("xyz", 10);
+        // Should return no or very few results (no strong matches)
+        assert!(results.len() < 2, "Short query should have high threshold");
+
+        // Longer query with weak match
+        let results = engine.search("xyza", 10);
+        assert!(results.is_empty(), "No results should match random string");
+    }
+
+    #[test]
+    fn test_prefix_match_priority() {
+        let entries = vec![
+            create_test_entry("Firefox", Some("Web Browser"), vec![]),
+            create_test_entry("Firewall Configuration", Some("Security"), vec![]),
+            create_test_entry("Archive Manager", Some("File Roller"), vec![]),
+        ];
+
+        let arena = DesktopEntryArena::from_vec(entries);
+        let engine = SearchEngine::new(arena, false);
+
+        // "fire" should prioritize prefix matches
+        let results = engine.search("fire", 10);
+        assert!(!results.is_empty());
+        // Both Firefox and Firewall start with "fire", should rank higher
+        assert!(results[0].name == "Firefox" || results[0].name == "Firewall Configuration");
+    }
+
+    #[test]
+    fn test_keyword_exact_match() {
+        let entries = vec![
+            create_test_entry(
+                "GIMP",
+                Some("Image Editor"),
+                vec!["photo", "graphics", "edit"],
+            ),
+            create_test_entry(
+                "Inkscape",
+                Some("Vector Graphics"),
+                vec!["vector", "svg", "draw"],
+            ),
+        ];
+
+        let arena = DesktopEntryArena::from_vec(entries);
+        let engine = SearchEngine::new(arena, false);
+
+        // Exact keyword match should rank high
+        let results = engine.search("photo", 10);
+        assert!(!results.is_empty());
+        assert_eq!(results[0].name, "GIMP");
+
+        let results = engine.search("vector", 10);
+        assert!(!results.is_empty());
+        assert_eq!(results[0].name, "Inkscape");
     }
 }

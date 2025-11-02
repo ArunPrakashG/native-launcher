@@ -1,7 +1,7 @@
 use anyhow::Result;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::PathBuf;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 /// Path to the Unix socket for daemon communication
 pub fn socket_path() -> PathBuf {
@@ -107,4 +107,61 @@ pub fn cleanup_socket() {
         debug!("Cleaning up daemon socket at {:?}", sock_path);
         let _ = std::fs::remove_file(&sock_path);
     }
+}
+
+/// Start background indexing thread for browser history
+/// Rebuilds index on startup and periodically (every hour)
+pub fn start_browser_indexer(browser_plugin: std::sync::Arc<crate::plugins::BrowserHistoryPlugin>) {
+    use std::thread;
+    use std::time::Duration;
+
+    thread::spawn(move || {
+        info!("Browser indexer thread started");
+
+        // Get reference to index
+        let index = match browser_plugin.get_index() {
+            Some(idx) => idx,
+            None => {
+                warn!("No browser index available, indexer thread exiting");
+                return;
+            }
+        };
+
+        // Initial index build/update
+        if index.needs_rebuild() {
+            info!("Browser index needs rebuild, fetching history...");
+            let entries = browser_plugin.fetch_all_history();
+            if let Err(e) = index.rebuild_index(entries) {
+                error!("Failed to build browser index: {}", e);
+            } else {
+                if let Ok(count) = index.entry_count() {
+                    info!("Browser index built with {} entries", count);
+                }
+            }
+        } else {
+            if let Ok(age) = index.get_index_age() {
+                info!(
+                    "Browser index is {} seconds old, skipping initial rebuild",
+                    age
+                );
+            }
+        }
+
+        // Periodic refresh (every hour)
+        loop {
+            thread::sleep(Duration::from_secs(3600)); // 1 hour
+
+            if index.needs_rebuild() {
+                info!("Refreshing browser index...");
+                let entries = browser_plugin.fetch_all_history();
+                if let Err(e) = index.rebuild_index(entries) {
+                    error!("Failed to refresh browser index: {}", e);
+                } else {
+                    if let Ok(count) = index.entry_count() {
+                        info!("Browser index refreshed with {} entries", count);
+                    }
+                }
+            }
+        }
+    });
 }

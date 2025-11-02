@@ -54,7 +54,8 @@ impl BuiltInTheme {
 /// * `theme_name` - Theme name from config (e.g., "dark", "dracula", or path to CSS file)
 ///
 /// # Examples
-/// ```
+/// ```no_run
+/// use native_launcher::ui::theme::load_theme_with_name;
 /// // Load dark theme
 /// load_theme_with_name("dark");
 ///

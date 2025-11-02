@@ -4,9 +4,19 @@ use native_launcher::plugins::PluginManager;
 use native_launcher::usage::UsageTracker;
 use std::time::{Duration, Instant};
 
+fn should_skip_perf() -> bool {
+    cfg!(debug_assertions) && std::env::var("NL_STRICT_PERF").is_err()
+}
+
 /// Performance test: Measure input lag during typing simulation
 #[test]
 fn test_typing_performance_target() {
+    if should_skip_perf() {
+        eprintln!(
+            "Skipping typing performance test in debug build. Set NL_STRICT_PERF=1 and run in --release to enable."
+        );
+        return;
+    }
     // Target: Each keystroke should complete search in <16ms (60fps)
     // Stretch goal: <8ms (120fps)
     const MAX_KEYSTROKE_LATENCY_MS: u128 = 16;
@@ -17,7 +27,7 @@ fn test_typing_performance_target() {
     let entry_arena = DesktopEntryArena::from_vec(entries);
     let usage_tracker = UsageTracker::new();
     let config = Config::default();
-    let plugin_manager = PluginManager::new(entry_arena, Some(usage_tracker), &config);
+    let plugin_manager = PluginManager::new(entry_arena, Some(usage_tracker), None, &config);
 
     // Simulate typing "config.txt" (triggers file index at char 3)
     let query = "config.txt";
@@ -73,6 +83,12 @@ fn test_typing_performance_target() {
 /// Test: File index search should be fast when cached
 #[test]
 fn test_file_index_cache_performance() {
+    if should_skip_perf() {
+        eprintln!(
+            "Skipping cache performance test in debug build. Set NL_STRICT_PERF=1 and run in --release to enable."
+        );
+        return;
+    }
     const MAX_CACHED_SEARCH_MS: u128 = 5;
 
     let scanner = DesktopScanner::new();
@@ -80,7 +96,7 @@ fn test_file_index_cache_performance() {
     let entry_arena = DesktopEntryArena::from_vec(entries);
     let usage_tracker = UsageTracker::new();
     let config = Config::default();
-    let plugin_manager = PluginManager::new(entry_arena, Some(usage_tracker), &config);
+    let plugin_manager = PluginManager::new(entry_arena, Some(usage_tracker), None, &config);
 
     // First search (cache miss, can be slow)
     let query = "config";
@@ -111,6 +127,12 @@ fn test_file_index_cache_performance() {
 /// Test: Short queries (< 3 chars) should be very fast (no file index)
 #[test]
 fn test_short_query_performance() {
+    if should_skip_perf() {
+        eprintln!(
+            "Skipping short query performance test in debug build. Set NL_STRICT_PERF=1 and run in --release to enable."
+        );
+        return;
+    }
     const MAX_SHORT_QUERY_MS: u128 = 5;
 
     let scanner = DesktopScanner::new();
@@ -118,7 +140,7 @@ fn test_short_query_performance() {
     let entry_arena = DesktopEntryArena::from_vec(entries);
     let usage_tracker = UsageTracker::new();
     let config = Config::default();
-    let plugin_manager = PluginManager::new(entry_arena, Some(usage_tracker), &config);
+    let plugin_manager = PluginManager::new(entry_arena, Some(usage_tracker), None, &config);
 
     let short_queries = vec!["f", "fi", "fir"];
 
@@ -142,6 +164,12 @@ fn test_short_query_performance() {
 /// Test: App-only searches should be fast (no file index trigger)
 #[test]
 fn test_app_search_performance() {
+    if should_skip_perf() {
+        eprintln!(
+            "Skipping app search performance test in debug build. Set NL_STRICT_PERF=1 and run in --release to enable."
+        );
+        return;
+    }
     const MAX_APP_SEARCH_MS: u128 = 10;
 
     let scanner = DesktopScanner::new();
@@ -149,7 +177,7 @@ fn test_app_search_performance() {
     let entry_arena = DesktopEntryArena::from_vec(entries);
     let usage_tracker = UsageTracker::new();
     let config = Config::default();
-    let plugin_manager = PluginManager::new(entry_arena, Some(usage_tracker), &config);
+    let plugin_manager = PluginManager::new(entry_arena, Some(usage_tracker), None, &config);
 
     // Queries that should match apps, not trigger file search
     let app_queries = vec!["firefox", "chrome", "terminal"];
@@ -190,8 +218,12 @@ fn test_file_index_worst_case() {
 
     for query in file_queries {
         // Fresh plugin manager to avoid cache
-        let plugin_manager =
-            PluginManager::new(entry_arena.clone(), Some(usage_tracker.clone()), &config);
+        let plugin_manager = PluginManager::new(
+            entry_arena.clone(),
+            Some(usage_tracker.clone()),
+            None,
+            &config,
+        );
 
         let start = Instant::now();
         let _results = plugin_manager.search(query, 10);
@@ -223,12 +255,18 @@ fn test_file_index_worst_case() {
 /// Test: Progressive typing latency analysis
 #[test]
 fn test_progressive_typing_analysis() {
+    if should_skip_perf() {
+        eprintln!(
+            "Skipping progressive typing analysis in debug build. Set NL_STRICT_PERF=1 and run in --release to enable."
+        );
+        return;
+    }
     let scanner = DesktopScanner::new();
     let entries = scanner.scan().expect("Failed to scan desktop entries");
     let entry_arena = DesktopEntryArena::from_vec(entries);
     let usage_tracker = UsageTracker::new();
     let config = Config::default();
-    let plugin_manager = PluginManager::new(entry_arena, Some(usage_tracker), &config);
+    let plugin_manager = PluginManager::new(entry_arena, Some(usage_tracker), None, &config);
 
     let queries = vec![
         ("firefox", "App name"),

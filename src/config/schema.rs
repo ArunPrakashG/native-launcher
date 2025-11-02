@@ -51,6 +51,8 @@ pub struct SearchConfig {
     pub usage_ranking: bool,
     /// Minimum score threshold for results (0-100)
     pub min_score_threshold: i32,
+    /// Enable pins/favorites feature (Ctrl+P toggle, UI star, scoring boost)
+    pub enable_pins: bool,
 }
 
 impl Default for SearchConfig {
@@ -60,6 +62,7 @@ impl Default for SearchConfig {
             fuzzy_matching: true,
             usage_ranking: true,
             min_score_threshold: 0,
+            enable_pins: true,
         }
     }
 }
@@ -78,6 +81,10 @@ pub struct UIConfig {
     pub theme: String,
     /// Show empty state on launch (Spotlight-style) - hides results until user types
     pub empty_state_on_launch: bool,
+    /// UI density: "compact" or "comfortable"
+    pub density: String,
+    /// Accent color: "coral", "teal", "violet", "blue", "green"
+    pub accent: String,
 }
 
 impl Default for UIConfig {
@@ -88,6 +95,8 @@ impl Default for UIConfig {
             animation_duration: 150,
             theme: "dark".to_string(),
             empty_state_on_launch: true,
+            density: "comfortable".to_string(),
+            accent: "coral".to_string(),
         }
     }
 }
@@ -112,6 +121,20 @@ pub struct PluginsConfig {
     pub launcher: bool,
     /// Enable screenshot plugin
     pub screenshot: bool,
+    /// Enable emoji picker plugin
+    pub emoji: bool,
+    /// Enable clipboard history plugin
+    pub clipboard: bool,
+    /// Enable browser history plugin (recent tabs/websites)
+    pub browser_history: bool,
+    /// Enable recent documents plugin
+    pub recent_documents: bool,
+    /// Enable window management plugin (Hyprland/Sway)
+    pub window_management: bool,
+    /// Enable session switcher plugin (windows/workspaces)
+    pub session_switcher: bool,
+    /// Enable git projects plugin (repository search)
+    pub git_projects: bool,
     /// Shell command prefix (default: ">")
     pub shell_prefix: String,
 }
@@ -127,6 +150,13 @@ impl Default for PluginsConfig {
             files: true,
             launcher: true,
             screenshot: true,
+            emoji: true,
+            clipboard: true,
+            browser_history: true,
+            recent_documents: true,
+            window_management: true,
+            session_switcher: true,
+            git_projects: true,
             shell_prefix: ">".to_string(),
         }
     }
