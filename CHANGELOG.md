@@ -4,6 +4,8 @@
 
 ## [0.2.0] - 2025-11-02
 
+## [0.2.0] - 2025-11-02
+
 ### 🎉 Major Features
 
 #### Session Management & Window Control
